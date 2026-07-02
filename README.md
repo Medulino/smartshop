@@ -15,7 +15,6 @@ cualquer tipo de establecimiento.
 - Bootstrap 5
 - Docker + Docker Compose
 - Google Gemini API (lectura de fotos con IA)
-- Mistral AI (lectura de fotos con IA)
 - WeasyPrint (exportación PDF)
 - Pillow (procesamiento de imágenes)
 
@@ -118,4 +117,4 @@ docker exec -i compra_db psql -U $DB_USER $DB_NAME < backups/backup_manual.sql
 
 ## Autor
 
-Nombre del alumno — Proyecto Final de Curso
+Medulino — Proyecto Final de Curso
