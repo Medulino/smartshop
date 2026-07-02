@@ -1,0 +1,61 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Compra Inteligente</title>
+    {% bootstrap_css %}
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-8 col-md-5">
+
+            <div class="text-center mb-4">
+                <div class="fs-1">🛒</div>
+                <h1 class="h3">Compra Inteligente</h1>
+                <p class="text-muted">Inicia sesión para continuar</p>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" value="{{ email }}"
+                                   class="form-control" placeholder="tu@email.com"
+                                   autofocus required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Contraseña</label>
+                            <input type="password" name="password"
+                                   class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            Entrar
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+
+            <p class="text-center mt-3 text-muted">
+                ¿No tienes cuenta?
+                <a href="{% url 'usuarios:registro' %}">Regístrate</a>
+            </p>
+
+        </div>
+    </div>
+</div>
+
+{% bootstrap_javascript %}
+</body>
+</html>

@@ -1,0 +1,87 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📜 Historial</title>
+{% bootstrap_css %}
+<style>body { background-color: #f8f9fa; }</style>
+</head>
+<body>
+<div class="container py-4" style="max-width: 720px;">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">📜 Historial</h1>
+    <a href="{% url 'compra:lista' %}" class="btn btn-outline-secondary btn-sm">← Volver</a>
+</div>
+
+<h5 class="mb-3">⭐ Plantillas guardadas</h5>
+{% if plantillas %}
+<div class="list-group mb-4">
+    {% for p in plantillas %}
+    <div class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ p.nombre_plantilla }}</strong>
+            <div class="text-muted small">{{ p.total_productos }} productos · {{ p.supermercado.nombre }}</div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="usarPlantilla({{ p.id }})">Usar</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="eliminarPlantilla({{ p.id }})">✕</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">Aún no tienes plantillas guardadas.</p>
+{% endif %}
+
+<h5 class="mb-3">🗓️ Últimas compras</h5>
+{% if listas %}
+<div class="list-group">
+    {% for l in listas|slice:":5" %}
+    <div class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ l.fecha }}</strong>
+            <div class="text-muted small">{{ l.total_productos }} productos · {{ l.supermercado.nombre }}</div>
+        </div>
+        <button class="btn btn-success btn-sm" onclick="repetirLista({{ l.id }})">🔁 Repetir</button>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">Aún no tienes listas en el historial.</p>
+{% endif %}
+
+</div>
+{% bootstrap_javascript %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+async function usarPlantilla(id) {
+    const resp = await fetch(`/plantilla/usar/${id}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) window.location.href = "{% url 'compra:lista' %}";
+}
+
+async function repetirLista(id) {
+    const resp = await fetch(`/lista/repetir/${id}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) window.location.href = "{% url 'compra:lista' %}";
+}
+
+async function eliminarPlantilla(id) {
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    const resp = await fetch(`/plantilla/eliminar/${id}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+</script>
+</body>
+</html>

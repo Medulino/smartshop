@@ -1,0 +1,506 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛒 Compra Inteligente</title>
+{% bootstrap_css %}
+<style>
+body { background-color: #f8f9fa; }
+.pasillo-header { background-color: #f1f3f5; font-weight: 600; }
+.item-done span { text-decoration: line-through; color: #adb5bd; }
+.stat-card { border-radius: 12px; }
+
+/* Checkbox visible en fondo blanco */
+.form-check-input {
+    width: 22px !important;
+    height: 22px !important;
+    border: 2px solid #6c757d !important;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.foto-zone {
+    border: 2px dashed #ced4da;
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.foto-zone:hover { border-color: #0d6efd; }
+
+.spinner-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+.spinner-overlay.active { display: flex; }
+select option { background-color: #2b2b2b; color: #f0f0f0; }
+
+/* Cabecera en dos líneas */
+.navbar-compra {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #fff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 16px;
+}
+.navbar-titulo {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.navbar-controles {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.navbar-controles select {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+}
+.navbar-controles .btn {
+    min-width: 40px;
+    min-height: 36px;
+    flex-shrink: 0;
+}
+
+/* Botones de acción con scroll horizontal */
+.acciones-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.acciones-scroll::-webkit-scrollbar { display: none; }
+.acciones-scroll .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 40px;
+}
+
+/* Items de lista más grandes para el dedo */
+.list-group-item { min-height: 48px; }
+.btn-eliminar {
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+</head>
+<body>
+
+<!-- Spinner de carga -->
+<div class="spinner-overlay" id="spinner">
+    <div class="text-center text-white">
+        <div class="spinner-border mb-3" style="width:3rem;height:3rem;"></div>
+        <p class="fs-5" id="spinner-msg">Analizando tu lista...</p>
+    </div>
+</div>
+
+<!-- Cabecera sticky -->
+<div class="navbar-compra">
+    <div class="navbar-titulo">🛒 Compra Inteligente</div>
+    <div class="navbar-controles">
+        <select class="form-select form-select-sm"
+                onchange="cambiarSuper(this.value)">
+            {% for s in supermercados %}
+            <option value="{{ s.id }}" {% if s == supermercado %}selected{% endif %}>
+                {{ s.nombre|truncatechars:20 }}
+            </option>
+            {% endfor %}
+        </select>
+        <a href="{% url 'compra:historial' %}" class="btn btn-outline-secondary btn-sm">📜</a>
+        <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">⚙️</a>
+        <form method="post" action="{% url 'usuarios:logout' %}" class="d-inline m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">🚪 Salir</button>        </form>
+    </div>
+</div>
+
+<div class="container py-3 px-3" style="max-width: 720px;">
+
+{% if supermercado %}
+
+<!-- Estadísticas -->
+<div class="row g-2 mb-3">
+    <div class="col-4">
+        <div class="card stat-card text-center py-2">
+            <div class="fs-3 fw-bold">{{ lista.total_productos }}</div>
+            <div class="text-muted" style="font-size:11px">total</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card stat-card text-center py-2">
+            <div class="fs-3 fw-bold text-success">{{ lista.productos_en_carro }}</div>
+            <div class="text-muted" style="font-size:11px">en el carro</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card stat-card text-center py-2">
+            <div class="fs-3 fw-bold text-primary">{{ lista.productos_pendientes }}</div>
+            <div class="text-muted" style="font-size:11px">pendientes</div>
+        </div>
+    </div>
+</div>
+
+<!-- Zona de foto -->
+<div class="card mb-3">
+    <div class="card-body p-2">
+        <div class="foto-zone" onclick="document.getElementById('foto-input').click()">
+            <div id="preview-wrap"></div>
+            <div id="foto-placeholder">
+                <div class="fs-2">📷</div>
+                <p class="mb-0 text-muted small">Toca para subir una foto de tu lista</p>
+            </div>
+        </div>
+        <input type="file" id="foto-input" accept="image/*" class="d-none" onchange="analizarFoto(event)">
+    </div>
+</div>
+
+<!-- Añadir producto -->
+<div class="input-group mb-3">
+    <input type="text" id="input-producto" class="form-control"
+           placeholder="Añadir producto..." autocomplete="off"
+           style="font-size:16px">
+    <button class="btn btn-success px-3" onclick="añadirProducto()">+ Añadir</button>
+</div>
+
+<!-- Mensajes -->
+<div id="msg-ok" class="alert alert-success d-none py-2"></div>
+<div id="msg-err" class="alert alert-danger d-none py-2"></div>
+
+<!-- Botones de acción con scroll horizontal -->
+<div class="acciones-scroll mb-3">
+    <button class="btn btn-outline-danger btn-sm" onclick="vaciarMarcados()">🗑️Marcados</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="vaciarLista()">🗑️Todo</button>
+    {% if flags.plantillas %}
+    <button class="btn btn-outline-success btn-sm" onclick="guardarPlantilla()">⭐Mis Listas</button>
+    {% endif %}
+    <button class="btn btn-success btn-sm" onclick="finalizarCompra()">✅Finalizar</button>
+    {% if flags.exportar_pdf %}
+    <a href="{% url 'compra:exportar_pdf' lista.id %}" class="btn btn-outline-primary btn-sm">📄PDF</a>
+    {% endif %}
+</div>
+
+<!-- Lista por pasillos -->
+<div id="lista-container">
+    {% regroup items by pasillo as grupos %}
+    {% for grupo in grupos %}
+    <div class="card mb-2">
+        <div class="card-header pasillo-header d-flex justify-content-between align-items-center py-2">
+            <span style="font-size:14px">
+                {% if grupo.grouper %}
+                {{ grupo.grouper.orden }}. {{ grupo.grouper.nombre }}
+                {% else %}
+                ❓ Sin asignar
+                {% endif %}
+            </span>
+            <span class="badge bg-success rounded-pill">{{ grupo.list|length }}</span>
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for item in grupo.list %}
+            <li class="list-group-item d-flex align-items-center gap-2 {% if item.en_carro %}item-done{% endif %}"
+                id="item-{{ item.id }}">
+                <input type="checkbox" class="form-check-input"
+                       {% if item.en_carro %}checked{% endif %}
+                       onchange="toggleCarro({{ item.id }}, this)">
+                <span class="flex-grow-1" style="font-size:15px">{{ item.nombre|capfirst }}</span>
+                {% if not item.pasillo %}
+                <select class="form-select form-select-sm w-auto"
+                        onchange="asignarPasillo({{ item.id }}, this.value)"
+                        style="font-size:13px; max-width:130px">
+                    <option value="">📍 Asignar...</option>
+                    {% for p in supermercado.pasillos.all %}
+                    <option value="{{ p.id }}">{{ p.orden }}. {{ p.nombre|truncatechars:15 }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <button class="btn btn-link text-danger p-0 btn-eliminar"
+                        onclick="eliminarProducto({{ item.id }})">✕</button>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+        <div class="fs-1">🛒</div>
+        <p>Lista vacía. ¡Añade productos o sube una foto!</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    No tienes ningún supermercado configurado todavía.
+    {% if request.user.is_superuser %}
+    <a href="/gestion-ci/compra/supermercado/add/">Añadir desde el panel.</a>    {% else %}
+    Pronto podrás configurar tu propio supermercado desde aquí.
+    {% endif %}
+</div>
+{% endif %}
+
+</div>
+
+{% if flags.onboarding and not prefs.onboarding_completado %}
+<div class="modal fade" id="modalOnboarding" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h4 class="modal-title">👋 Bienvenido a Compra Inteligente</h4>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-4">Guía rápida para sacarle el máximo partido:</p>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">📝</div>
+                                <h6 class="fw-bold">Añadir productos</h6>
+                                <p class="text-muted small mb-0">Escribe un producto y pulsa Añadir o Enter. La app lo asignará automáticamente al pasillo correcto de tu supermercado.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">📷</div>
+                                <h6 class="fw-bold">Sube una foto de tu lista</h6>
+                                <p class="text-muted small mb-0">¿Tienes una lista escrita a mano? Sube una foto y la IA leerá y ordenará los productos automáticamente por pasillos.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">📍</div>
+                                <h6 class="fw-bold">Productos sin pasillo</h6>
+                                <p class="text-muted small mb-0">Si un producto aparece como "Sin asignar", usa el selector para asignarlo. La app lo recordará para siempre.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">⚙️</div>
+                                <h6 class="fw-bold">Configura tu supermercado</h6>
+                                <p class="text-muted small mb-0">Pulsa ⚙️ para reordenar pasillos, añadir nuevos o gestionar palabras clave según tu super real.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">⭐</div>
+                                <h6 class="fw-bold">Guarda tus listas favoritas</h6>
+                                <p class="text-muted small mb-0">Pulsa "⭐ Mis listas" para guardar tu lista actual como plantilla y reutilizarla cuando quieras.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">📜</div>
+                                <h6 class="fw-bold">Historial de compras</h6>
+                                <p class="text-muted small mb-0">Pulsa 📜 para ver tus compras anteriores y repetir cualquiera de las últimas 5 con un solo toque.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="card border-0 bg-success bg-opacity-10">
+                            <div class="card-body">
+                                <div class="fs-2 mb-2">✅</div>
+                                <h6 class="fw-bold text-success">Durante la compra</h6>
+                                <p class="text-muted small mb-0">Los productos aparecen ordenados por pasillos. Marca cada uno cuando lo metas en el carro. Al terminar pulsa "✅ Finalizar" para cerrar la lista y guardarla en el historial. Descarga el PDF si lo necesitas.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-success px-4" onclick="cerrarOnboarding()">
+                    ¡Entendido, empezar!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% bootstrap_javascript %}
+<script>
+const LISTA_ID = {{ lista.id|default:"null" }};
+const CSRF = '{{ csrf_token }}';
+
+function cambiarSuper(id) {
+    window.location.href = `/?supermercado=${id}`;
+}
+
+function mostrarMensaje(texto, tipo) {
+    const ok = document.getElementById('msg-ok');
+    const err = document.getElementById('msg-err');
+    ok.classList.add('d-none');
+    err.classList.add('d-none');
+    if (tipo === 'ok') {
+        ok.textContent = texto;
+        ok.classList.remove('d-none');
+        setTimeout(() => ok.classList.add('d-none'), 4000);
+    } else {
+        err.textContent = texto;
+        err.classList.remove('d-none');
+        setTimeout(() => err.classList.add('d-none'), 6000);
+    }
+}
+
+async function añadirProducto() {
+    const input = document.getElementById('input-producto');
+    const nombre = input.value.trim();
+    if (!nombre || !LISTA_ID) return;
+    const resp = await fetch("{% url 'compra:añadir_producto' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre, lista_id: LISTA_ID })
+    });
+    if (resp.ok) { input.value = ''; location.reload(); }
+}
+
+async function analizarFoto(event) {
+    const file = event.target.files[0];
+    if (!file || !LISTA_ID) return;
+    const wrap = document.getElementById('preview-wrap');
+    const placeholder = document.getElementById('foto-placeholder');
+    wrap.innerHTML = `<img src="${URL.createObjectURL(file)}" class="img-fluid rounded mb-2" style="max-height:120px">`;
+    placeholder.classList.add('d-none');
+    document.getElementById('spinner').classList.add('active');
+    const formData = new FormData();
+    formData.append('foto', file);
+    formData.append('lista_id', LISTA_ID);
+    formData.append('csrfmiddlewaretoken', CSRF);
+    try {
+        const resp = await fetch("{% url 'compra:analizar_foto' %}", {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        document.getElementById('spinner').classList.remove('active');
+        if (resp.ok) {
+            mostrarMensaje(`✅ Se añadieron ${data.productos_añadidos} productos`, 'ok');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarMensaje(data.error || 'Error al procesar la imagen', 'err');
+        }
+    } catch (e) {
+        document.getElementById('spinner').classList.remove('active');
+        mostrarMensaje('Error de conexión. Inténtalo de nuevo.', 'err');
+    }
+    event.target.value = '';
+}
+
+async function toggleCarro(itemId, checkbox) {
+    const resp = await fetch(`/toggle/${itemId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+    else checkbox.checked = !checkbox.checked;
+}
+
+async function eliminarProducto(itemId) {
+    const resp = await fetch(`/eliminar/${itemId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+async function vaciarMarcados() {
+    if (!LISTA_ID) return;
+    const resp = await fetch(`/vaciar-marcados/${LISTA_ID}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+async function vaciarLista() {
+    if (!confirm('¿Seguro que quieres vaciar toda la lista?')) return;
+    const resp = await fetch(`/vaciar/${LISTA_ID}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+async function asignarPasillo(itemId, pasilloId) {
+    if (!pasilloId) return;
+    const resp = await fetch(`/asignar-pasillo/${itemId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ pasillo_id: pasilloId })
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        mostrarMensaje(`✅ "${data.pasillo}" guardado para próximas compras`, 'ok');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        mostrarMensaje('Error al asignar el pasillo', 'err');
+    }
+}
+
+async function guardarPlantilla() {
+    const nombre = prompt('¿Cómo quieres llamar a esta plantilla?');
+    if (!nombre) return;
+    const resp = await fetch(`/plantilla/guardar/${LISTA_ID}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre })
+    });
+    if (resp.ok) mostrarMensaje('✅ Plantilla guardada', 'ok');
+}
+
+async function finalizarCompra() {
+    const pendientes = {{ lista.productos_pendientes|default:0 }};
+    if (pendientes > 0) {
+        if (!confirm(`Tienes ${pendientes} productos pendientes. ¿Finalizar igualmente?`)) return;
+    }
+    const resp = await fetch(`/archivar/${LISTA_ID}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+document.getElementById('input-producto')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') añadirProducto();
+});
+
+{% if flags.onboarding and not prefs.onboarding_completado %}
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = new bootstrap.Modal(document.getElementById('modalOnboarding'));
+    modal.show();
+});
+
+async function cerrarOnboarding() {
+    await fetch("{% url 'usuarios:completar_onboarding' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('modalOnboarding')).hide();
+}
+{% endif %}
+</script>
+</body>
+</html>
