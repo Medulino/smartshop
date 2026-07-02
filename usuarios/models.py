@@ -106,8 +106,8 @@ class PreferenciaUsuario(models.Model):
     )
  
     onboarding_completado = models.BooleanField(
-    default=False,
-    verbose_name='Ha visto la guía de bienvenida'
+        default=False,
+        verbose_name='Ha visto la guía de bienvenida'
     )
 
     # Lista
