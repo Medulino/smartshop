@@ -56,7 +56,7 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 .navbar-titulo {
     font-size: 18px;
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 0;
 }
 .navbar-controles {
     display: flex;
@@ -113,7 +113,9 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 
 <!-- Cabecera sticky -->
 <div class="navbar-compra">
-    <div class="navbar-titulo">🛒 Compra Inteligente</div>
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="navbar-titulo">🛒 Compra Inteligente</span>
+        <span style="font-size:11px; color:#888; white-space:nowrap;">👤 {{ request.user.username }}</span>    </div>
     <div class="navbar-controles">
         <select class="form-select form-select-sm"
                 onchange="cambiarSuper(this.value)">
@@ -127,7 +129,8 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
         <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">⚙️</a>
         <form method="post" action="{% url 'usuarios:logout' %}" class="d-inline m-0">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger btn-sm">🚪 Salir</button>        </form>
+            <button type="submit" class="btn btn-outline-danger btn-sm">🚪 Salir</button>
+        </form>
     </div>
 </div>
 
