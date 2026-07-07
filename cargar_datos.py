@@ -10,11 +10,10 @@ from compra.models import Supermercado, Pasillo, Keyword
 def cargar_datos():
     from usuarios.models import Usuario
 
-    # Cogemos el superusuario para asignarle los datos iniciales
     try:
         admin = Usuario.objects.filter(is_superuser=True).first()
         if not admin:
-            print("❌ No hay superusuario. Ejecuta primero: python3 manage.py createsuperuser")
+            print("❌ No hay superusuario.")
             return
     except Exception as e:
         print(f"❌ Error al obtener usuario: {e}")
@@ -32,7 +31,12 @@ def cargar_datos():
     else:
         print("ℹ️  Supermercado ya existía")
 
-    Pasillo.objects.filter(supermercado=super_).delete()
+    # Solo carga datos si el supermercado es nuevo
+    if not creado:
+        pasillos_existentes = Pasillo.objects.filter(supermercado=super_).count()
+        if pasillos_existentes > 0:
+            print(f"ℹ️  Pasillos ya existían ({pasillos_existentes}), no se recarga")
+            return
 
     datos = [
         ("Perfumería", 1, [
