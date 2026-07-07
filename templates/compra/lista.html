@@ -161,17 +161,19 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 </div>
 
 <!-- Zona de foto -->
-<div class="card mb-3">
-    <div class="card-body p-2">
-        <div class="foto-zone" onclick="document.getElementById('foto-input').click()">
-            <div id="preview-wrap"></div>
-            <div id="foto-placeholder">
-                <div class="fs-2">📷</div>
-                <p class="mb-0 text-muted small">Toca para subir una foto de tu lista</p>
-            </div>
-        </div>
-        <input type="file" id="foto-input" accept="image/*" class="d-none" onchange="analizarFoto(event)">
+<div class="card-body p-2">
+    <div id="preview-wrap" class="mb-2"></div>
+    <p class="text-muted small text-center mb-2">Elige cómo quieres subir tu lista de la compra</p>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('foto-camara').click()">
+            📷 Hacer foto
+        </button>
+        <button class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('foto-galeria').click()">
+            🖼️ Galería
+        </button>
     </div>
+    <input type="file" id="foto-camara" accept="image/*" capture="environment" class="d-none" onchange="analizarFoto(event)">
+    <input type="file" id="foto-galeria" accept="image/*" class="d-none" onchange="analizarFoto(event)">
 </div>
 
 <!-- Añadir producto -->
@@ -384,9 +386,7 @@ async function analizarFoto(event) {
     const file = event.target.files[0];
     if (!file || !LISTA_ID) return;
     const wrap = document.getElementById('preview-wrap');
-    const placeholder = document.getElementById('foto-placeholder');
     wrap.innerHTML = `<img src="${URL.createObjectURL(file)}" class="img-fluid rounded mb-2" style="max-height:120px">`;
-    placeholder.classList.add('d-none');
     document.getElementById('spinner').classList.add('active');
     const formData = new FormData();
     formData.append('foto', file);
