@@ -115,3 +115,12 @@ docker exec -i compra_db psql -U $DB_USER $DB_NAME < backups/backup_manual.sql
 ## Autor
 
 Medulino — Proyecto Final de Curso
+
+## Posibles mejoras a implementar
+
+-Dar la opción al usuario que crea su supermercado de subirlo globalmente para que cualquiera pueda usarlo
+
+-Sistema de likes para los supermercados creados por los usuarios
+
+-Seleccionar recetas disponibles en la aplicación, para cuántos comensales y que la app añada a la lista los ingredientes y la cantidad a comprar.
+
