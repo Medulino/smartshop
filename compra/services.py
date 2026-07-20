@@ -39,14 +39,15 @@ def redimensionar_imagen(imagen_file, max_lado=1600, max_peso_mb=15):
     return buffer
 
 
-def leer_lista_desde_imagen(imagen_file):
-    import google.generativeai as genai
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+import PIL.Image
+import google.generativeai as genai
 
-    modelos = [
-    'gemini-3-flash-preview',
-    'gemini-robotics-er-1.6-preview',
-    ]
+def leer_lista_desde_imagen(imagen_file):
+    """
+    Transcribe una lista de la compra manuscrita a partir de una imagen
+    utilizando el modelo estable Gemini 1.5 Flash.
+    """
+    genai.configure(api_key=settings.GEMINI_API_KEY)
 
     prompt = """
     Eres un experto en transcripción de listas de la compra.
@@ -56,23 +57,27 @@ def leer_lista_desde_imagen(imagen_file):
     sin numeración, sin guiones. Ejemplo: leche, pan, tomates, jabón
     """
 
-    buffer_reducido = redimensionar_imagen(imagen_file)
-    img = PIL.Image.open(buffer_reducido)
+    try:
+        # Preparamos y abrimos la imagen
+        buffer_reducido = redimensionar_imagen(imagen_file)
+        img = PIL.Image.open(buffer_reducido)
 
-    for nombre_modelo in modelos:
-        try:
-            model = genai.GenerativeModel(model_name=nombre_modelo)
-            response = model.generate_content([prompt, img])
-            if response.text:
-                texto = response.text.replace('\n', ',').replace(';', ',')
-                productos = [
-                    p.strip().lower()
-                    for p in texto.split(',')
-                    if p.strip() and len(p.strip()) > 1
-                ]
-                return productos, None
-        except Exception as e:
-            ultimo_error = str(e)
-            continue
+        # Usamos directamente el modelo rápido, económico y estable de producción
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content([prompt, img])
 
-    return [], f"El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde. ({ultimo_error[:100]})"
+        if response.text:
+            # Normalizamos saltos de línea y puntos y comas a comas simples
+            texto = response.text.replace('\n', ',').replace(';', ',')
+            productos = [
+                p.strip().lower()
+                for p in texto.split(',')
+                if p.strip() and len(p.strip()) > 1
+            ]
+            return productos, None
+
+        return [], "No se pudo extraer texto de la imagen."
+
+    except Exception as e:
+        error_msg = str(e)[:100]
+        return [], f"El servicio de análisis no está disponible ahora mismo. ({error_msg})"
