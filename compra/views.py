@@ -267,6 +267,23 @@ def crear_pasillo(request, supermercado_id):
 
 @login_required
 @require_POST
+def renombrar_pasillo(request, pasillo_id):
+    pasillo = get_object_or_404(
+        Pasillo, id=pasillo_id, supermercado__usuario=request.user
+    )
+    data = json.loads(request.body)
+    nombre = data.get('nombre', '').strip()
+
+    if not nombre:
+        return JsonResponse({'error': 'Falta el nombre'}, status=400)
+
+    pasillo.nombre = nombre
+    pasillo.save()
+    return JsonResponse({'ok': True, 'nombre': pasillo.nombre})
+
+
+@login_required
+@require_POST
 def eliminar_pasillo(request, pasillo_id):
     pasillo = get_object_or_404(
         Pasillo, id=pasillo_id, supermercado__usuario=request.user

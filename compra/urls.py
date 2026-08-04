@@ -16,6 +16,7 @@ urlpatterns = [
     # Configuración
     path('configuracion/', views.ConfiguracionView.as_view(), name='configuracion'),
     path('configuracion/pasillo/crear/<int:supermercado_id>/', views.crear_pasillo, name='crear_pasillo'),
+    path('configuracion/pasillo/renombrar/<int:pasillo_id>/', views.renombrar_pasillo, name='renombrar_pasillo'),
     path('configuracion/pasillo/eliminar/<int:pasillo_id>/', views.eliminar_pasillo, name='eliminar_pasillo'),
     path('configuracion/pasillo/reordenar/<int:supermercado_id>/', views.reordenar_pasillos, name='reordenar_pasillos'),
     path('configuracion/keyword/crear/<int:pasillo_id>/', views.crear_keyword, name='crear_keyword'),

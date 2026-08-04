@@ -38,7 +38,10 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
             <li class="list-group-item pasillo-row" data-id="{{ pasillo.id }}">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span>☰ {{ pasillo.orden }}. {{ pasillo.nombre }}</span>
-                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarPasillo({{ pasillo.id }}, this)">✕</button>
+                    <span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="renombrarPasillo({{ pasillo.id }}, '{{ pasillo.nombre|escapejs }}')">✎</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarPasillo({{ pasillo.id }}, this)">✕</button>
+                    </span>
                 </div>
                 <div class="mb-1">
                     {% for kw in pasillo.keywords.all %}
@@ -74,6 +77,17 @@ async function crearPasillo(superId) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
         body: JSON.stringify({ nombre })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function renombrarPasillo(pasilloId, nombreActual) {
+    const nombre = prompt('Nuevo nombre del pasillo:', nombreActual);
+    if (!nombre || !nombre.trim() || nombre.trim() === nombreActual) return;
+    const resp = await fetch(`/configuracion/pasillo/renombrar/${pasilloId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre: nombre.trim() })
     });
     if (resp.ok) location.reload();
 }
