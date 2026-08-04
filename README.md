@@ -1,5 +1,7 @@
 # 🛒 Compra Inteligente
 
+🌐 **Demo en producción:** https://smartshop-jc36.onrender.com
+
 Aplicación web desarrollada como proyecto final de curso. 
 Permite gestionar listas de la compra de forma inteligente, ordenando los productos según los pasillos del supermercado del usuario y leyendo listas manuscritas mediante IA para una ruta optimizada ahorrando tiempo
 para el usuario.
@@ -73,13 +75,8 @@ Edita `.env` con tus valores reales (SECRET_KEY, contraseña de base de datos y 
 docker compose up -d
 ```
 
-**4.** Aplica migraciones y carga datos iniciales:
-
-```bash
-docker exec -it compra_web python3 manage.py migrate
-docker exec -it compra_web python3 manage.py createsuperuser
-docker exec -it compra_web python3 cargar_datos.py
-docker exec -it compra_web python3 crear_flags.py
+**4.** Todo se configura automáticamente al arrancar: 
+migraciones, superusuario, datos iniciales y feature flags.
 ```
 
 **5.** Accede a la aplicación en `http://localhost:8000`
@@ -118,3 +115,12 @@ docker exec -i compra_db psql -U $DB_USER $DB_NAME < backups/backup_manual.sql
 ## Autor
 
 Medulino — Proyecto Final de Curso
+
+## Posibles mejoras a implementar
+
+-Dar la opción al usuario que crea su supermercado de subirlo globalmente para que cualquiera pueda usarlo
+
+-Sistema de likes para los supermercados creados por los usuarios
+
+-Seleccionar recetas disponibles en la aplicación, para cuántos comensales y que la app añada a la lista los ingredientes y la cantidad a comprar.
+

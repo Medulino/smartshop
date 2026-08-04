@@ -44,9 +44,8 @@ def leer_lista_desde_imagen(imagen_file):
     genai.configure(api_key=settings.GEMINI_API_KEY)
 
     modelos = [
-        'models/gemini-robotics-er-1.6-preview',
-        'gemini-2.0-flash-lite',
-        'gemini-2.0-flash',
+    'gemini-3-flash-preview',
+    'gemini-robotics-er-1.6-preview',
     ]
 
     prompt = """
@@ -73,8 +72,7 @@ def leer_lista_desde_imagen(imagen_file):
                 ]
                 return productos, None
         except Exception as e:
-            if "429" in str(e):
-                continue
-            return [], str(e)
+            ultimo_error = str(e)
+            continue
 
-    return [], "Límite de consultas alcanzado. Espera un momento y vuelve a intentarlo."
+    return [], f"El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde. ({ultimo_error[:100]})"
