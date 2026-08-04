@@ -30,7 +30,4 @@ urlpatterns = [
     path('lista/repetir/<int:lista_id>/', views.repetir_lista, name='repetir_lista'),
     path('lista/pdf/<int:lista_id>/', views.exportar_pdf, name='exportar_pdf'),
     path('archivar/<int:lista_id>/', views.archivar_lista, name='archivar_lista'),
-
-    # Herramienta temporal, quitar tras usarla
-    path('herramientas/cargar-mercadona-agustinos/', views.ejecutar_carga_mercadona_agustinos, name='cargar_mercadona_agustinos'),
 ]

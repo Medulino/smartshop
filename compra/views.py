@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views import View
 from django.contrib.auth.decorators import login_required
@@ -7,8 +7,6 @@ from django.utils.decorators import method_decorator
 from django.db import models
 from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword
 import json
-import io
-import contextlib
 from usuarios.models import FeatureFlag
 from django.core.cache import cache
 from django.conf import settings
@@ -471,22 +469,3 @@ def exportar_pdf(request, lista_id):
     response = HttpResponse(pdf, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="lista_{lista.fecha}.pdf"'
     return response
-
-
-@login_required
-def ejecutar_carga_mercadona_agustinos(request):
-    """
-    Vista temporal para ejecutar cargar_mercadona_agustinos.py desde el
-    navegador en entornos sin shell (Render free tier). Solo superusuarios.
-    Quitar esta vista y su URL una vez usada.
-    """
-    if not request.user.is_superuser:
-        return HttpResponse('No autorizado.', status=403)
-
-    from cargar_mercadona_agustinos import cargar_mercadona_agustinos
-
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        cargar_mercadona_agustinos(request.user.email)
-
-    return HttpResponse(buffer.getvalue(), content_type='text/plain; charset=utf-8')
