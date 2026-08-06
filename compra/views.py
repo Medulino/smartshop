@@ -21,14 +21,36 @@ def _normalizar(texto):
 
 
 def inferir_pasillo(nombre_producto, supermercado):
+    """
+    Busca la keyword más específica que encaje con el nombre del producto.
+    Prioridad: coincidencia exacta > keyword contenida en el nombre (la más
+    larga gana) > nombre contenido en una keyword (la más corta gana), para
+    que compuestos genéricos ("sal", "fresa", "patata"...) no le roben el
+    pasillo a coincidencias más precisas ("salchichón", "yogur de fresa",
+    "patatas fritas"...).
+    """
     nombre = _normalizar(nombre_producto)
     keywords = Keyword.objects.filter(
         pasillo__supermercado=supermercado
     ).select_related('pasillo')
+
+    contenidas = []
+    contenedoras = []
     for kw in keywords:
         palabra = _normalizar(kw.palabra)
-        if palabra in nombre or nombre in palabra:
+        if not palabra:
+            continue
+        if palabra == nombre:
             return kw.pasillo
+        if palabra in nombre:
+            contenidas.append((len(palabra), kw.pasillo))
+        elif nombre in palabra:
+            contenedoras.append((len(palabra), kw.pasillo))
+
+    if contenidas:
+        return max(contenidas, key=lambda x: x[0])[1]
+    if contenedoras:
+        return min(contenedoras, key=lambda x: x[0])[1]
     return None
 
 
@@ -174,7 +196,7 @@ def asignar_pasillo(request, item_id):
     item.pasillo = pasillo
     item.save()
 
-    palabra = item.nombre.lower().strip()
+    palabra = _normalizar(item.nombre)
     Keyword.objects.filter(
         pasillo__supermercado=pasillo.supermercado,
         palabra=palabra
@@ -345,7 +367,7 @@ def crear_keyword(request, pasillo_id):
         Pasillo, id=pasillo_id, supermercado__usuario=request.user
     )
     data = json.loads(request.body)
-    palabra = data.get('palabra', '').strip().lower()
+    palabra = _normalizar(data.get('palabra', ''))
 
     if not palabra:
         return JsonResponse({'error': 'Falta la palabra'}, status=400)
