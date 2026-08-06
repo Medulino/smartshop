@@ -7,18 +7,27 @@ from django.utils.decorators import method_decorator
 from django.db import models
 from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword
 import json
+import unicodedata
 from usuarios.models import FeatureFlag
 from django.core.cache import cache
 from django.conf import settings
 
 
+def _normalizar(texto):
+    """Minúsculas y sin tildes/diacríticos, para comparar sin depender de acentos."""
+    texto = texto.lower().strip()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join(c for c in texto if not unicodedata.combining(c))
+
+
 def inferir_pasillo(nombre_producto, supermercado):
-    nombre = nombre_producto.lower().strip()
+    nombre = _normalizar(nombre_producto)
     keywords = Keyword.objects.filter(
         pasillo__supermercado=supermercado
     ).select_related('pasillo')
     for kw in keywords:
-        if kw.palabra in nombre or nombre in kw.palabra:
+        palabra = _normalizar(kw.palabra)
+        if palabra in nombre or nombre in palabra:
             return kw.pasillo
     return None
 
