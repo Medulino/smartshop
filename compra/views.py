@@ -68,27 +68,37 @@ class ListaCompraView(View):
 @require_POST
 def añadir_producto(request):
     data = json.loads(request.body)
-    nombre = data.get('nombre', '').strip()
+    texto = data.get('nombre', '').strip()
     lista_id = data.get('lista_id')
 
-    if not nombre or not lista_id:
+    if not texto or not lista_id:
         return JsonResponse({'error': 'Datos incompletos'}, status=400)
 
     lista = get_object_or_404(Lista, id=lista_id, usuario=request.user)
-    pasillo = inferir_pasillo(nombre, lista.supermercado)
 
-    item = ListaItem.objects.create(
-        lista=lista,
-        nombre=nombre,
-        pasillo=pasillo
-    )
-    return JsonResponse({
-        'id': item.id,
-        'nombre': item.nombre,
-        'pasillo': item.pasillo.nombre if item.pasillo else 'Sin asignar',
-        'pasillo_orden': item.pasillo.orden if item.pasillo else 999,
-        'en_carro': item.en_carro,
-    })
+    nombres = [
+        p.strip()
+        for p in texto.replace('\n', ',').replace(';', ',').split(',')
+        if p.strip()
+    ]
+
+    items_creados = []
+    for nombre in nombres:
+        pasillo = inferir_pasillo(nombre, lista.supermercado)
+        item = ListaItem.objects.create(
+            lista=lista,
+            nombre=nombre,
+            pasillo=pasillo
+        )
+        items_creados.append({
+            'id': item.id,
+            'nombre': item.nombre,
+            'pasillo': item.pasillo.nombre if item.pasillo else 'Sin asignar',
+            'pasillo_orden': item.pasillo.orden if item.pasillo else 999,
+            'en_carro': item.en_carro,
+        })
+
+    return JsonResponse({'items': items_creados})
 
 
 @login_required
