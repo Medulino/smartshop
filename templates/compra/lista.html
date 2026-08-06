@@ -224,16 +224,14 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
                        {% if item.en_carro %}checked{% endif %}
                        onchange="toggleCarro({{ item.id }}, this)">
                 <span class="flex-grow-1" style="font-size:15px">{{ item.nombre|capfirst }}</span>
-                {% if not item.pasillo %}
                 <select class="form-select form-select-sm w-auto"
                         onchange="asignarPasillo({{ item.id }}, this.value)"
                         style="font-size:13px; max-width:130px">
-                    <option value="">📍 Asignar...</option>
+                    <option value="">📍 {% if item.pasillo %}Cambiar...{% else %}Asignar...{% endif %}</option>
                     {% for p in supermercado.pasillos.all %}
-                    <option value="{{ p.id }}">{{ p.orden }}. {{ p.nombre|truncatechars:15 }}</option>
+                    <option value="{{ p.id }}" {% if item.pasillo_id == p.id %}selected{% endif %}>{{ p.orden }}. {{ p.nombre|truncatechars:15 }}</option>
                     {% endfor %}
                 </select>
-                {% endif %}
                 <button class="btn btn-link text-danger p-0 btn-eliminar"
                         onclick="eliminarProducto({{ item.id }})">✕</button>
             </li>

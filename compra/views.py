@@ -155,9 +155,14 @@ def asignar_pasillo(request, item_id):
     item.pasillo = pasillo
     item.save()
 
+    palabra = item.nombre.lower().strip()
+    Keyword.objects.filter(
+        pasillo__supermercado=pasillo.supermercado,
+        palabra=palabra
+    ).exclude(pasillo=pasillo).delete()
     Keyword.objects.get_or_create(
         pasillo=pasillo,
-        palabra=item.nombre.lower().strip()
+        palabra=palabra
     )
 
     return JsonResponse({

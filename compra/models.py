@@ -52,6 +52,7 @@ class Keyword(models.Model):
     palabra = models.CharField(max_length=100)
 
     class Meta:
+        ordering = ['palabra']
         verbose_name = 'Palabra clave'
         verbose_name_plural = 'Palabras clave'
         unique_together = ('pasillo', 'palabra')
