@@ -24,7 +24,12 @@ def importar_bloque(texto, supermercado):
 
         if ':' in linea:
             nombre, resto = linea.split(':', 1)
-            palabras = [p.strip().lower() for p in resto.split(',') if p.strip()]
+            palabras = [
+                p.strip().lower().rstrip('.,;')
+                for p in resto.split(',')
+                if p.strip()
+            ]
+            palabras = [p for p in palabras if p]
         else:
             nombre, palabras = linea, []
 
@@ -136,6 +141,58 @@ def redimensionar_imagen(imagen_file, max_lado=1600, max_peso_mb=15):
     img.save(buffer, format='JPEG', quality=85, optimize=True)
     buffer.seek(0)
     return buffer
+
+
+def estructurar_pasillos_con_ia(descripcion_libre):
+    """
+    Convierte una descripción libre de pasillos (dictada o escrita sin
+    ningún formato) en el texto estructurado que espera `importar_bloque`
+    ("Nombre del pasillo: palabra1, palabra2..."), usando Gemini, para
+    que el usuario no tenga que aprender ninguna sintaxis.
+    """
+    import google.generativeai as genai
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+
+    modelos = [
+        'gemini-3-flash-preview',
+        'gemini-robotics-er-1.6-preview',
+    ]
+
+    prompt = """
+    Eres un experto organizando supermercados. Un usuario te va a describir,
+    de forma libre y desordenada (puede estar dictado por voz, con errores
+    o de forma coloquial), los pasillos de un supermercado y lo que hay en
+    cada uno.
+
+    Devuelve el resultado EXCLUSIVAMENTE en este formato, una línea por
+    pasillo, sin numerar y sin ningún texto antes ni después:
+
+    Nombre del pasillo: producto1, producto2, producto3...
+
+    Reglas:
+    - Una línea por pasillo, sin líneas en blanco entre medio.
+    - Las palabras clave en minúsculas, sin tildes si es posible.
+    - No repitas la misma palabra clave en dos pasillos distintos.
+    - Si el usuario solo da el nombre de una categoría sin productos,
+      complétala tú con entre 8 y 15 productos típicos de esa categoría
+      en un supermercado español.
+    - No añadas explicaciones, numeración, guiones ni comentarios: SOLO
+      las líneas con el formato pedido.
+
+    Esto es lo que ha descrito el usuario:
+    """ + descripcion_libre
+
+    for nombre_modelo in modelos:
+        try:
+            model = genai.GenerativeModel(model_name=nombre_modelo)
+            response = model.generate_content(prompt)
+            if response.text:
+                return response.text.strip(), None
+        except Exception as e:
+            ultimo_error = str(e)
+            continue
+
+    return None, f"El servicio de IA no está disponible ahora mismo. Inténtalo más tarde. ({ultimo_error[:100]})"
 
 
 def leer_lista_desde_imagen(imagen_file):

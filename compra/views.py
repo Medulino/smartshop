@@ -214,12 +214,12 @@ def asignar_pasillo(request, item_id):
     })
 
 
-def usuario_supero_limite_fotos(usuario, limite=10, ventana_segundos=3600):
+def usuario_supero_limite(usuario, accion, limite=10, ventana_segundos=3600):
     """
-    Comprueba si el usuario ha superado el límite de fotos
-    permitidas en la ventana de tiempo (por defecto 10 fotos/hora).
+    Comprueba si el usuario ha superado el límite de usos de una acción
+    (identificada por `accion`) en la ventana de tiempo dada.
     """
-    clave = f"limite_fotos_{usuario.id}"
+    clave = f"limite_{accion}_{usuario.id}"
     intentos = cache.get(clave, 0)
 
     if intentos >= limite:
@@ -227,6 +227,10 @@ def usuario_supero_limite_fotos(usuario, limite=10, ventana_segundos=3600):
 
     cache.set(clave, intentos + 1, ventana_segundos)
     return False
+
+
+def usuario_supero_limite_fotos(usuario, limite=10, ventana_segundos=3600):
+    return usuario_supero_limite(usuario, 'fotos', limite, ventana_segundos)
 
 
 @login_required
@@ -306,18 +310,31 @@ class SupermercadoDetalleView(View):
 @login_required
 @require_POST
 def crear_supermercado(request):
-    from .services import plantilla_por_defecto, copiar_pasillos_keywords, importar_bloque
+    from .services import (
+        plantilla_por_defecto, copiar_pasillos_keywords,
+        importar_bloque, estructurar_pasillos_con_ia,
+    )
 
     data = json.loads(request.body)
     nombre = data.get('nombre', '').strip()
     direccion = data.get('direccion', '').strip()
-    bloque = data.get('bloque', '').strip()
+    descripcion = data.get('descripcion', '').strip()
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
 
     if Supermercado.objects.filter(usuario=request.user, nombre=nombre).exists():
         return JsonResponse({'error': 'Ya tienes un supermercado con ese nombre'}, status=400)
+
+    bloque = None
+    if descripcion:
+        if usuario_supero_limite(request.user, 'ia_pasillos'):
+            return JsonResponse({
+                'error': 'Has alcanzado el límite de 10 usos por hora. Inténtalo más tarde.'
+            }, status=429)
+        bloque, error = estructurar_pasillos_con_ia(descripcion)
+        if error:
+            return JsonResponse({'error': error}, status=500)
 
     supermercado = Supermercado.objects.create(
         usuario=request.user,
@@ -342,16 +359,25 @@ def crear_supermercado(request):
 @login_required
 @require_POST
 def importar_bloque_pasillos(request, supermercado_id):
-    from .services import importar_bloque
+    from .services import importar_bloque, estructurar_pasillos_con_ia
 
     supermercado = get_object_or_404(
         Supermercado, id=supermercado_id, usuario=request.user
     )
     data = json.loads(request.body)
-    bloque = data.get('bloque', '').strip()
+    descripcion = data.get('descripcion', '').strip()
 
-    if not bloque:
-        return JsonResponse({'error': 'Pega o dicta al menos un pasillo'}, status=400)
+    if not descripcion:
+        return JsonResponse({'error': 'Cuéntanos qué pasillos quieres añadir'}, status=400)
+
+    if usuario_supero_limite(request.user, 'ia_pasillos'):
+        return JsonResponse({
+            'error': 'Has alcanzado el límite de 10 usos por hora. Inténtalo más tarde.'
+        }, status=429)
+
+    bloque, error = estructurar_pasillos_con_ia(descripcion)
+    if error:
+        return JsonResponse({'error': error}, status=500)
 
     creados = importar_bloque(bloque, supermercado)
     return JsonResponse({'ok': True, 'creados': creados})

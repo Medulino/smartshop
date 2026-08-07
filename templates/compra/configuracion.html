@@ -30,19 +30,16 @@ body { background-color: #f8f9fa; }
         <div class="input-group">
             <input type="text" class="form-control" id="nuevo-super-nombre"
                    placeholder="Nombre del supermercado nuevo...">
-            <button class="btn btn-success" onclick="crearSupermercado()">+ Crear supermercado</button>
+            <button class="btn btn-success" id="btn-crear-super" onclick="crearSupermercado()">+ Crear supermercado</button>
         </div>
-        <div class="form-text mb-2">Por defecto se crea con los pasillos y palabras clave de una plantilla base, para no empezar de cero.</div>
+        <div class="form-text mb-2">Por defecto se crea con los pasillos de una plantilla base, para no empezar de cero.</div>
 
         <details>
-            <summary class="text-primary small" style="cursor:pointer">¿Prefieres partir de tu propia lista en vez de la plantilla?</summary>
+            <summary class="text-primary small" style="cursor:pointer">¿Prefieres describir tú los pasillos?</summary>
             <div class="mt-2">
-                <textarea class="form-control" id="nuevo-super-bloque" rows="5"
-                    placeholder="Escribe o dicta (con el micrófono del teclado) un pasillo por línea:
-
-Perfumería: champú, gel, desodorante
-Panadería: pan, bollería, cereales"></textarea>
-                <div class="form-text">Si rellenas esto, se usa en vez de la plantilla base.</div>
+                <textarea class="form-control" id="nuevo-super-descripcion" rows="4"
+                    placeholder="Cuéntanos qué pasillos tienes, como te salga, sin preocuparte del formato. Puedes dictarlo con el micrófono del teclado. Por ejemplo: 'primero está perfumería con champú y gel, luego panadería con pan y bollería...'"></textarea>
+                <div class="form-text">La IA lo organiza en pasillos y palabras clave automáticamente. Si lo rellenas, se usa en vez de la plantilla base.</div>
             </div>
         </details>
     </div>
@@ -79,18 +76,29 @@ async function crearSupermercado() {
     const input = document.getElementById('nuevo-super-nombre');
     const nombre = input.value.trim();
     if (!nombre) return;
-    const bloque = document.getElementById('nuevo-super-bloque').value.trim();
-    const resp = await fetch(`/configuracion/supermercado/crear/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({ nombre, bloque })
-    });
-    if (resp.ok) {
-        const data = await resp.json();
-        window.location.href = `/configuracion/${data.id}/`;
-    } else {
-        const data = await resp.json();
-        alert(data.error || 'No se pudo crear el supermercado');
+    const descripcion = document.getElementById('nuevo-super-descripcion').value.trim();
+
+    const boton = document.getElementById('btn-crear-super');
+    const textoOriginal = boton.textContent;
+    boton.disabled = true;
+    boton.textContent = descripcion ? '✨ Organizando con IA...' : 'Creando...';
+
+    try {
+        const resp = await fetch(`/configuracion/supermercado/crear/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ nombre, descripcion })
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            window.location.href = `/configuracion/${data.id}/`;
+        } else {
+            const data = await resp.json();
+            alert(data.error || 'No se pudo crear el supermercado');
+        }
+    } finally {
+        boton.disabled = false;
+        boton.textContent = textoOriginal;
     }
 }
 </script>
