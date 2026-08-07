@@ -21,8 +21,8 @@ class ListaItemInline(admin.TabularInline):
 
 @admin.register(Supermercado)
 class SupermercadoAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'direccion', 'activo', 'created_at']
-    list_filter = ['activo']
+    list_display = ['nombre', 'usuario', 'direccion', 'activo', 'publico', 'total_likes', 'created_at']
+    list_filter = ['activo', 'publico']
     search_fields = ['nombre']
     inlines = [PasilloInline]
 

@@ -4,6 +4,43 @@ import PIL.ImageOps
 from django.conf import settings
 
 
+def duplicar_supermercado(origen, usuario, nombre=None):
+    """
+    Copia un Supermercado (con sus pasillos y keywords) como uno nuevo,
+    propiedad de `usuario`. Si ya tiene uno con ese nombre, le añade un
+    sufijo numérico para no chocar con la restricción unique_together.
+    """
+    from .models import Supermercado, Pasillo, Keyword
+
+    nombre_base = nombre or origen.nombre
+    nombre_final = nombre_base
+    sufijo = 2
+    while Supermercado.objects.filter(usuario=usuario, nombre=nombre_final).exists():
+        nombre_final = f"{nombre_base} ({sufijo})"
+        sufijo += 1
+
+    nuevo = Supermercado.objects.create(
+        usuario=usuario,
+        nombre=nombre_final,
+        direccion=origen.direccion,
+        activo=True,
+    )
+
+    for pasillo_original in origen.pasillos.all():
+        nuevo_pasillo = Pasillo.objects.create(
+            supermercado=nuevo,
+            nombre=pasillo_original.nombre,
+            orden=pasillo_original.orden,
+        )
+        keywords = [
+            Keyword(pasillo=nuevo_pasillo, palabra=kw.palabra)
+            for kw in pasillo_original.keywords.all()
+        ]
+        Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
+
+    return nuevo
+
+
 def redimensionar_imagen(imagen_file, max_lado=1600, max_peso_mb=15):
     imagen_file.seek(0, 2)
     peso_mb = imagen_file.tell() / (1024 * 1024)

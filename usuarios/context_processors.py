@@ -9,7 +9,7 @@ def flags(request):
         'plantillas', 'historial', 'productos_favoritos',
         'sugerencias_inteligentes', 'compartir_lista',
         'exportar_pdf', 'estadisticas', 'modo_colaborativo',
-        'onboarding', 'configuracion_super',
+        'onboarding', 'configuracion_super', 'supermercados_publicos',
     ]
 
     prefs, _ = PreferenciaUsuario.objects.get_or_create(

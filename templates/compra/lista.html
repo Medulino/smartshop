@@ -126,6 +126,9 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
             {% endfor %}
         </select>
         <a href="{% url 'compra:historial' %}" class="btn btn-outline-secondary btn-sm">📜</a>
+        {% if flags.supermercados_publicos %}
+        <a href="{% url 'compra:explorar' %}" class="btn btn-outline-secondary btn-sm">🌍</a>
+        {% endif %}
         <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">⚙️</a>
         <form method="post" action="{% url 'usuarios:logout' %}" class="d-inline m-0">
             {% csrf_token %}
@@ -226,10 +229,11 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
                 <span class="flex-grow-1" style="font-size:15px">{{ item.nombre|capfirst }}</span>
                 <select class="form-select form-select-sm w-auto"
                         onchange="asignarPasillo({{ item.id }}, this.value)"
-                        style="font-size:13px; max-width:130px">
+                        title="{% if item.pasillo %}{{ item.pasillo.nombre }}{% endif %}"
+                        style="font-size:13px; max-width:150px">
                     <option value="">📍 {% if item.pasillo %}Cambiar...{% else %}Asignar...{% endif %}</option>
                     {% for p in supermercado.pasillos.all %}
-                    <option value="{{ p.id }}" {% if item.pasillo_id == p.id %}selected{% endif %}>{{ p.orden }}. {{ p.nombre|truncatechars:15 }}</option>
+                    <option value="{{ p.id }}" {% if item.pasillo_id == p.id %}selected{% endif %}>{{ p.orden }}. {{ p.nombre }}</option>
                     {% endfor %}
                 </select>
                 <button class="btn btn-link text-danger p-0 btn-eliminar"

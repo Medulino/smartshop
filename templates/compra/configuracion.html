@@ -19,12 +19,40 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0">⚙️ Configuración</h1>
-    <a href="{% url 'compra:lista' %}" class="btn btn-outline-secondary btn-sm">← Volver</a>
+    <div>
+        {% if flags.supermercados_publicos %}
+        <a href="{% url 'compra:explorar' %}" class="btn btn-outline-primary btn-sm">🌍 Explorar</a>
+        {% endif %}
+        <a href="{% url 'compra:lista' %}" class="btn btn-outline-secondary btn-sm">← Volver</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="input-group">
+            <input type="text" class="form-control" id="nuevo-super-nombre"
+                   placeholder="Nombre del supermercado nuevo...">
+            <button class="btn btn-success" onclick="crearSupermercado()">+ Crear supermercado</button>
+        </div>
+    </div>
 </div>
 
 {% for super in supermercados %}
 <div class="card mb-4">
-    <div class="card-header fw-bold">{{ super.nombre }}</div>
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+        <span>{{ super.nombre }}</span>
+        {% if flags.supermercados_publicos %}
+        <span>
+            {% if super.publico %}
+            <span class="badge bg-success">🌍 Público · ❤️ {{ super.total_likes }}</span>
+            {% endif %}
+            <button class="btn btn-sm {% if super.publico %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                    onclick="alternarPublicacion({{ super.id }}, this)">
+                {% if super.publico %}Despublicar{% else %}🌍 Publicar{% endif %}
+            </button>
+        </span>
+        {% endif %}
+    </div>
     <div class="card-body">
 
         <div class="input-group mb-3">
@@ -68,6 +96,31 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 {% bootstrap_javascript %}
 <script>
 const CSRF = '{{ csrf_token }}';
+
+async function crearSupermercado() {
+    const input = document.getElementById('nuevo-super-nombre');
+    const nombre = input.value.trim();
+    if (!nombre) return;
+    const resp = await fetch(`/configuracion/supermercado/crear/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre })
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        const data = await resp.json();
+        alert(data.error || 'No se pudo crear el supermercado');
+    }
+}
+
+async function alternarPublicacion(superId, btn) {
+    const resp = await fetch(`/configuracion/supermercado/publicar/${superId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
 
 async function crearPasillo(superId) {
     const input = document.getElementById(`nuevo-pasillo-${superId}`);

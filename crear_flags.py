@@ -61,6 +61,11 @@ flags = [
         'descripcion': 'Vista para que el usuario configure su supermercado',
         'activo': True,
     },
+    {
+        'nombre': 'supermercados_publicos',
+        'descripcion': 'Publicar supermercados propios y usar los de otros usuarios (con likes)',
+        'activo': True,
+    },
 ]
 
 creados = 0

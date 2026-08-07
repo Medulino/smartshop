@@ -13,6 +13,17 @@ class Supermercado(models.Model):
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    publico = models.BooleanField(
+        default=False,
+        help_text='Si está marcado, cualquier usuario puede verlo en "Explorar" y copiarlo a su cuenta'
+    )
+    fecha_publicacion = models.DateTimeField(null=True, blank=True)
+    likes = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='supermercados_gustados',
+        blank=True
+    )
+
     class Meta:
         ordering = ['nombre']
         verbose_name = 'Supermercado'
@@ -22,6 +33,12 @@ class Supermercado(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.usuario.username})"
+
+    def total_likes(self):
+        return self.likes.count()
+
+    def total_pasillos(self):
+        return self.pasillos.count()
 
 
 class Pasillo(models.Model):

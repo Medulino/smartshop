@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.views import View
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
+from django.utils import timezone
 from django.db import models
 from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword
 import json
@@ -284,6 +285,96 @@ class ConfiguracionView(View):
         return render(request, self.template_name, {
             'supermercados': supermercados,
         })
+
+
+@login_required
+@require_POST
+def crear_supermercado(request):
+    data = json.loads(request.body)
+    nombre = data.get('nombre', '').strip()
+    direccion = data.get('direccion', '').strip()
+
+    if not nombre:
+        return JsonResponse({'error': 'Falta el nombre'}, status=400)
+
+    if Supermercado.objects.filter(usuario=request.user, nombre=nombre).exists():
+        return JsonResponse({'error': 'Ya tienes un supermercado con ese nombre'}, status=400)
+
+    supermercado = Supermercado.objects.create(
+        usuario=request.user,
+        nombre=nombre,
+        direccion=direccion,
+    )
+    return JsonResponse({
+        'ok': True,
+        'id': supermercado.id,
+        'nombre': supermercado.nombre,
+    })
+
+
+@login_required
+@require_POST
+def alternar_publicacion(request, supermercado_id):
+    """Publica o despublica un supermercado propio en 'Explorar'."""
+    supermercado = get_object_or_404(
+        Supermercado, id=supermercado_id, usuario=request.user
+    )
+    supermercado.publico = not supermercado.publico
+    supermercado.fecha_publicacion = timezone.now() if supermercado.publico else None
+    supermercado.save()
+    return JsonResponse({'ok': True, 'publico': supermercado.publico})
+
+
+@method_decorator(login_required, name='dispatch')
+class ExplorarSupermercadosView(View):
+    template_name = 'compra/explorar.html'
+
+    def get(self, request):
+        supermercados = Supermercado.objects.filter(
+            publico=True
+        ).select_related('usuario').annotate(
+            num_likes=models.Count('likes'),
+            num_pasillos=models.Count('pasillos', distinct=True),
+        ).order_by('-num_likes', '-fecha_publicacion')
+
+        ya_tengo = set(
+            Supermercado.objects.filter(usuario=request.user).values_list('nombre', flat=True)
+        )
+
+        return render(request, self.template_name, {
+            'supermercados': supermercados,
+            'ya_tengo': ya_tengo,
+        })
+
+
+@login_required
+@require_POST
+def alternar_like(request, supermercado_id):
+    supermercado = get_object_or_404(
+        Supermercado, id=supermercado_id, publico=True
+    )
+    if request.user in supermercado.likes.all():
+        supermercado.likes.remove(request.user)
+        te_gusta = False
+    else:
+        supermercado.likes.add(request.user)
+        te_gusta = True
+    return JsonResponse({
+        'ok': True,
+        'te_gusta': te_gusta,
+        'total_likes': supermercado.total_likes(),
+    })
+
+
+@login_required
+@require_POST
+def usar_supermercado_publico(request, supermercado_id):
+    """Copia un supermercado público (pasillos y keywords) a la cuenta del usuario."""
+    from .services import duplicar_supermercado
+
+    origen = get_object_or_404(Supermercado, id=supermercado_id, publico=True)
+    nuevo = duplicar_supermercado(origen, request.user)
+    return JsonResponse({'ok': True, 'id': nuevo.id, 'nombre': nuevo.nombre})
 
 
 @login_required

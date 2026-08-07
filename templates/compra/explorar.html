@@ -1,0 +1,93 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌍 Explorar supermercados</title>
+{% bootstrap_css %}
+<style>
+body { background-color: #f8f9fa; }
+.super-card { transition: box-shadow 0.15s; }
+.super-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.like-btn.activo { color: #dc3545; }
+</style>
+</head>
+<body>
+<div class="container py-4" style="max-width: 720px;">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">🌍 Explorar supermercados</h1>
+    <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">← Volver</a>
+</div>
+
+<p class="text-muted small">Supermercados que otros usuarios han publicado, con sus pasillos y palabras clave ya configurados. Cópialos a tu cuenta con "Usar esta plantilla" y ajústalos luego a tu gusto.</p>
+
+{% for super in supermercados %}
+<div class="card super-card mb-3" id="super-{{ super.id }}">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h5 class="card-title mb-1">{{ super.nombre }}</h5>
+                <p class="text-muted small mb-2">
+                    por {{ super.usuario.username }} · {{ super.num_pasillos }} pasillos
+                    {% if super.nombre in ya_tengo %}· <span class="text-success">ya tienes uno con este nombre</span>{% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <button class="btn btn-sm btn-outline-danger like-btn {% if request.user in super.likes.all %}activo{% endif %}"
+                    onclick="alternarLike({{ super.id }}, this)">
+                {% if request.user in super.likes.all %}❤️{% else %}🤍{% endif %}
+                <span class="contador">{{ super.num_likes }}</span>
+            </button>
+            <button class="btn btn-sm btn-success" onclick="usarPlantilla({{ super.id }}, this)">
+                📥 Usar esta plantilla
+            </button>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="text-center text-muted py-5">
+    <div class="fs-1">🌍</div>
+    <p>Todavía no hay ningún supermercado público.<br>¡Publica el tuyo desde ⚙️ Configuración!</p>
+</div>
+{% endfor %}
+
+</div>
+
+{% bootstrap_javascript %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+async function alternarLike(superId, btn) {
+    const resp = await fetch(`/explorar/like/${superId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    btn.classList.toggle('activo', data.te_gusta);
+    btn.querySelector('.contador').textContent = data.total_likes;
+    btn.innerHTML = (data.te_gusta ? '❤️' : '🤍') + ` <span class="contador">${data.total_likes}</span>`;
+}
+
+async function usarPlantilla(superId, btn) {
+    if (!confirm('¿Copiar este supermercado a tu cuenta?')) return;
+    btn.disabled = true;
+    const resp = await fetch(`/explorar/usar/${superId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        alert(`✅ "${data.nombre}" añadido a tus supermercados`);
+        window.location.href = "{% url 'compra:configuracion' %}";
+    } else {
+        btn.disabled = false;
+        alert('No se pudo copiar el supermercado');
+    }
+}
+</script>
+</body>
+</html>
