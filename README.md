@@ -116,6 +116,17 @@ docker exec -i compra_db psql -U $DB_USER $DB_NAME < backups/backup_manual.sql
 
 Medulino — Proyecto Final de Curso
 
+## Licencia
+
+Copyright (C) 2026 Medulino.
+
+Este programa es software libre bajo los términos de la GNU Affero General
+Public License v3.0 (AGPLv3): puedes usarlo, estudiarlo, modificarlo y
+redistribuirlo, pero cualquier versión modificada —incluida si solo la
+ofreces como servicio en red, sin distribuir el binario— debe publicar
+también su código fuente bajo la misma licencia. Ver [LICENSE](LICENSE)
+para el texto completo.
+
 ## Posibles mejoras a implementar
 
 -Dar la opción al usuario que crea su supermercado de subirlo globalmente para que cualquiera pueda usarlo
