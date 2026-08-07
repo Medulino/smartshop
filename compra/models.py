@@ -41,6 +41,42 @@ class Supermercado(models.Model):
         return self.pasillos.count()
 
 
+class Categoria(models.Model):
+    """
+    Categoría global de producto (p.ej. "Panadería", "Carnicería"),
+    independiente de cualquier supermercado. Un Pasillo se "etiqueta"
+    con una o varias categorías y hereda de golpe todas sus keywords,
+    para que un supermercado nuevo no tenga que empezar casi sin nada.
+    """
+    nombre = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Categoría'
+        verbose_name_plural = 'Categorías'
+
+    def __str__(self):
+        return self.nombre
+
+
+class CategoriaKeyword(models.Model):
+    categoria = models.ForeignKey(
+        Categoria,
+        on_delete=models.CASCADE,
+        related_name='keywords'
+    )
+    palabra = models.CharField(max_length=100)
+
+    class Meta:
+        ordering = ['palabra']
+        verbose_name = 'Palabra clave de categoría'
+        verbose_name_plural = 'Palabras clave de categoría'
+        unique_together = ('categoria', 'palabra')
+
+    def __str__(self):
+        return f"{self.palabra} → {self.categoria.nombre}"
+
+
 class Pasillo(models.Model):
     supermercado = models.ForeignKey(
         Supermercado,
@@ -49,6 +85,11 @@ class Pasillo(models.Model):
     )
     nombre = models.CharField(max_length=200)
     orden = models.PositiveIntegerField(default=1)
+    categorias = models.ManyToManyField(
+        Categoria,
+        related_name='pasillos',
+        blank=True
+    )
 
     class Meta:
         ordering = ['orden']

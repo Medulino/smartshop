@@ -22,6 +22,7 @@ urlpatterns = [
     path('configuracion/<int:supermercado_id>/', views.SupermercadoDetalleView.as_view(), name='supermercado_detalle'),
     path('configuracion/pasillo/crear/<int:supermercado_id>/', views.crear_pasillo, name='crear_pasillo'),
     path('configuracion/pasillo/renombrar/<int:pasillo_id>/', views.renombrar_pasillo, name='renombrar_pasillo'),
+    path('configuracion/pasillo/categoria/<int:pasillo_id>/<int:categoria_id>/', views.alternar_categoria_pasillo, name='alternar_categoria_pasillo'),
     path('configuracion/pasillo/eliminar/<int:pasillo_id>/', views.eliminar_pasillo, name='eliminar_pasillo'),
     path('configuracion/pasillo/reordenar/<int:supermercado_id>/', views.reordenar_pasillos, name='reordenar_pasillos'),
     path('configuracion/keyword/crear/<int:pasillo_id>/', views.crear_keyword, name='crear_keyword'),

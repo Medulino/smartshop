@@ -1,11 +1,30 @@
 from django.contrib import admin
-from .models import Supermercado, Pasillo, Keyword, Lista, ListaItem
+from .models import Supermercado, Pasillo, Keyword, Lista, ListaItem, Categoria, CategoriaKeyword
 
 
 class PasilloInline(admin.TabularInline):
     model = Pasillo
     extra = 1
     ordering = ['orden']
+
+
+class CategoriaKeywordInline(admin.TabularInline):
+    model = CategoriaKeyword
+    extra = 3
+
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ['nombre']
+    search_fields = ['nombre']
+    inlines = [CategoriaKeywordInline]
+
+
+@admin.register(CategoriaKeyword)
+class CategoriaKeywordAdmin(admin.ModelAdmin):
+    list_display = ['palabra', 'categoria']
+    list_filter = ['categoria']
+    search_fields = ['palabra']
 
 
 class KeywordInline(admin.TabularInline):
@@ -33,6 +52,7 @@ class PasilloAdmin(admin.ModelAdmin):
     list_filter = ['supermercado']
     search_fields = ['nombre']
     ordering = ['supermercado', 'orden']
+    filter_horizontal = ['categorias']
     inlines = [KeywordInline]
 
 

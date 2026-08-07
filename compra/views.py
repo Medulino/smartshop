@@ -6,24 +6,23 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.db import models
-from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword
+from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword, Categoria, CategoriaKeyword
 import json
-import unicodedata
+from .utils import normalizar as _normalizar
 from usuarios.models import FeatureFlag
 from django.core.cache import cache
 from django.conf import settings
 
 
-def _normalizar(texto):
-    """Minúsculas y sin tildes/diacríticos, para comparar sin depender de acentos."""
-    texto = texto.lower().strip()
-    texto = unicodedata.normalize('NFKD', texto)
-    return ''.join(c for c in texto if not unicodedata.combining(c))
-
-
 def inferir_pasillo(nombre_producto, supermercado):
     """
     Busca la keyword más específica que encaje con el nombre del producto.
+    Combina dos fuentes: las keywords propias del pasillo (Keyword) y las
+    de cualquier categoría global con la que esté etiquetado (Pasillo.
+    categorias -> CategoriaKeyword), para que un supermercado nuevo con
+    pocas keywords propias siga teniendo buena cobertura si sus pasillos
+    están etiquetados.
+
     Prioridad: coincidencia exacta > keyword contenida en el nombre (la más
     larga gana) > nombre contenido en una keyword (la más corta gana), para
     que compuestos genéricos ("sal", "fresa", "patata"...) no le roben el
@@ -31,22 +30,34 @@ def inferir_pasillo(nombre_producto, supermercado):
     "patatas fritas"...).
     """
     nombre = _normalizar(nombre_producto)
-    keywords = Keyword.objects.filter(
+
+    candidatos = []  # (palabra_normalizada, pasillo)
+
+    keywords_propias = Keyword.objects.filter(
         pasillo__supermercado=supermercado
     ).select_related('pasillo')
+    for kw in keywords_propias:
+        candidatos.append((_normalizar(kw.palabra), kw.pasillo))
+
+    pasillos = Pasillo.objects.filter(
+        supermercado=supermercado
+    ).prefetch_related('categorias__keywords')
+    for pasillo in pasillos:
+        for categoria in pasillo.categorias.all():
+            for ck in categoria.keywords.all():
+                candidatos.append((_normalizar(ck.palabra), pasillo))
 
     contenidas = []
     contenedoras = []
-    for kw in keywords:
-        palabra = _normalizar(kw.palabra)
+    for palabra, pasillo in candidatos:
         if not palabra:
             continue
         if palabra == nombre:
-            return kw.pasillo
+            return pasillo
         if palabra in nombre:
-            contenidas.append((len(palabra), kw.pasillo))
+            contenidas.append((len(palabra), pasillo))
         elif nombre in palabra:
-            contenedoras.append((len(palabra), kw.pasillo))
+            contenedoras.append((len(palabra), pasillo))
 
     if contenidas:
         return max(contenidas, key=lambda x: x[0])[1]
@@ -304,6 +315,7 @@ class SupermercadoDetalleView(View):
         )
         return render(request, self.template_name, {
             'super': supermercado,
+            'categorias': Categoria.objects.all(),
         })
 
 
@@ -478,16 +490,24 @@ def crear_pasillo(request, supermercado_id):
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
 
+    from .services import sugerir_categorias
+
     ultimo_orden = supermercado.pasillos.count() + 1
     pasillo = Pasillo.objects.create(
         supermercado=supermercado,
         nombre=nombre,
         orden=ultimo_orden
     )
+
+    categorias = sugerir_categorias(nombre)
+    if categorias:
+        pasillo.categorias.set(categorias)
+
     return JsonResponse({
         'id': pasillo.id,
         'nombre': pasillo.nombre,
         'orden': pasillo.orden,
+        'categorias': [c.nombre for c in categorias],
     })
 
 
@@ -506,6 +526,26 @@ def renombrar_pasillo(request, pasillo_id):
     pasillo.nombre = nombre
     pasillo.save()
     return JsonResponse({'ok': True, 'nombre': pasillo.nombre})
+
+
+@login_required
+@require_POST
+def alternar_categoria_pasillo(request, pasillo_id, categoria_id):
+    """Añade o quita una categoría global de un pasillo (hereda/deja de
+    heredar sus keywords)."""
+    pasillo = get_object_or_404(
+        Pasillo, id=pasillo_id, supermercado__usuario=request.user
+    )
+    categoria = get_object_or_404(Categoria, id=categoria_id)
+
+    if categoria in pasillo.categorias.all():
+        pasillo.categorias.remove(categoria)
+        activa = False
+    else:
+        pasillo.categorias.add(categoria)
+        activa = True
+
+    return JsonResponse({'ok': True, 'activa': activa})
 
 
 @login_required

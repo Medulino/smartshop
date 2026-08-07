@@ -2,6 +2,28 @@ import io
 import PIL.Image
 import PIL.ImageOps
 from django.conf import settings
+from .utils import normalizar
+
+
+def sugerir_categorias(nombre_pasillo):
+    """
+    Categorías globales cuyo nombre (o alguno de sus "trozos" separados
+    por '/', para las compuestas tipo "Droguería / Animales") aparece en
+    el nombre del pasillo o viceversa. Se usa para etiquetar pasillos
+    automáticamente al crearlos, sin que el usuario tenga que hacer nada.
+    """
+    from .models import Categoria
+
+    nombre_norm = normalizar(nombre_pasillo)
+    sugeridas = []
+    for categoria in Categoria.objects.all():
+        trozos = [normalizar(t) for t in categoria.nombre.split('/')]
+        for trozo in trozos:
+            trozo = trozo.strip()
+            if trozo and (trozo in nombre_norm or nombre_norm in trozo):
+                sugeridas.append(categoria)
+                break
+    return sugeridas
 
 
 def importar_bloque(texto, supermercado):
@@ -49,6 +71,10 @@ def importar_bloque(texto, supermercado):
             keywords = [Keyword(pasillo=pasillo, palabra=p) for p in palabras]
             Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
 
+        categorias = sugerir_categorias(nombre)
+        if categorias:
+            pasillo.categorias.set(categorias)
+
     return creados
 
 
@@ -67,6 +93,10 @@ def copiar_pasillos_keywords(origen, destino):
             for kw in pasillo_original.keywords.all()
         ]
         Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
+
+        categorias = list(pasillo_original.categorias.all())
+        if categorias:
+            nuevo_pasillo.categorias.set(categorias)
 
 
 def duplicar_supermercado(origen, usuario, nombre=None):
