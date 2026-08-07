@@ -4,13 +4,30 @@ import PIL.ImageOps
 from django.conf import settings
 
 
+def copiar_pasillos_keywords(origen, destino):
+    """Copia los pasillos y keywords de un Supermercado a otro ya existente."""
+    from .models import Pasillo, Keyword
+
+    for pasillo_original in origen.pasillos.all():
+        nuevo_pasillo = Pasillo.objects.create(
+            supermercado=destino,
+            nombre=pasillo_original.nombre,
+            orden=pasillo_original.orden,
+        )
+        keywords = [
+            Keyword(pasillo=nuevo_pasillo, palabra=kw.palabra)
+            for kw in pasillo_original.keywords.all()
+        ]
+        Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
+
+
 def duplicar_supermercado(origen, usuario, nombre=None):
     """
     Copia un Supermercado (con sus pasillos y keywords) como uno nuevo,
     propiedad de `usuario`. Si ya tiene uno con ese nombre, le añade un
     sufijo numérico para no chocar con la restricción unique_together.
     """
-    from .models import Supermercado, Pasillo, Keyword
+    from .models import Supermercado
 
     nombre_base = nombre or origen.nombre
     nombre_final = nombre_base
@@ -25,20 +42,22 @@ def duplicar_supermercado(origen, usuario, nombre=None):
         direccion=origen.direccion,
         activo=True,
     )
-
-    for pasillo_original in origen.pasillos.all():
-        nuevo_pasillo = Pasillo.objects.create(
-            supermercado=nuevo,
-            nombre=pasillo_original.nombre,
-            orden=pasillo_original.orden,
-        )
-        keywords = [
-            Keyword(pasillo=nuevo_pasillo, palabra=kw.palabra)
-            for kw in pasillo_original.keywords.all()
-        ]
-        Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
-
+    copiar_pasillos_keywords(origen, nuevo)
     return nuevo
+
+
+def plantilla_por_defecto():
+    """
+    Supermercado usado como base al crear uno nuevo desde cero, para no
+    empezar totalmente vacío. Prioriza el de un superusuario si hay varios
+    con ese nombre (por si algún usuario normal crea el suyo propio
+    llamado igual).
+    """
+    from .models import Supermercado
+
+    return Supermercado.objects.filter(
+        nombre="Mercadona Agustinos"
+    ).order_by('-usuario__is_superuser').first()
 
 
 def redimensionar_imagen(imagen_file, max_lado=1600, max_peso_mb=15):

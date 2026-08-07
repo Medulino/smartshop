@@ -278,6 +278,8 @@ def analizar_foto(request):
 
 @method_decorator(login_required, name='dispatch')
 class ConfiguracionView(View):
+    """Lista los supermercados del usuario. Elegir uno lleva al detalle
+    (pasillos/keywords) para no amontonarlo todo en una sola pantalla."""
     template_name = 'compra/configuracion.html'
 
     def get(self, request):
@@ -287,9 +289,25 @@ class ConfiguracionView(View):
         })
 
 
+@method_decorator(login_required, name='dispatch')
+class SupermercadoDetalleView(View):
+    """Gestión de pasillos y keywords de UN supermercado del usuario."""
+    template_name = 'compra/supermercado_detalle.html'
+
+    def get(self, request, supermercado_id):
+        supermercado = get_object_or_404(
+            Supermercado, id=supermercado_id, usuario=request.user
+        )
+        return render(request, self.template_name, {
+            'super': supermercado,
+        })
+
+
 @login_required
 @require_POST
 def crear_supermercado(request):
+    from .services import plantilla_por_defecto, copiar_pasillos_keywords
+
     data = json.loads(request.body)
     nombre = data.get('nombre', '').strip()
     direccion = data.get('direccion', '').strip()
@@ -305,11 +323,34 @@ def crear_supermercado(request):
         nombre=nombre,
         direccion=direccion,
     )
+
+    plantilla = plantilla_por_defecto()
+    if plantilla:
+        copiar_pasillos_keywords(plantilla, supermercado)
+
     return JsonResponse({
         'ok': True,
         'id': supermercado.id,
         'nombre': supermercado.nombre,
     })
+
+
+@login_required
+@require_POST
+def eliminar_supermercado(request, supermercado_id):
+    if request.user.is_staff:
+        supermercado = get_object_or_404(Supermercado, id=supermercado_id)
+    else:
+        supermercado = get_object_or_404(
+            Supermercado, id=supermercado_id, usuario=request.user
+        )
+        if supermercado.publico:
+            return JsonResponse({
+                'error': 'Está publicado en Explorar; despublícalo primero o pide a un administrador que lo elimine.'
+            }, status=403)
+
+    supermercado.delete()
+    return JsonResponse({'ok': True})
 
 
 @login_required

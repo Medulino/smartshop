@@ -1,0 +1,190 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚙️ {{ super.nombre }}</title>
+{% bootstrap_css %}
+<style>
+body { background-color: #f8f9fa; }
+.pasillo-row { cursor: move; background: #fff; }
+.pasillo-row:hover { background: #f1f3f5; }
+.keyword-badge { font-size: 12px; }
+select option { background-color: #2b2b2b; color: #f0f0f0; }
+</style>
+</head>
+<body>
+<div class="container py-4" style="max-width: 720px;">
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h1 class="h4 mb-0">⚙️ {{ super.nombre }}</h1>
+    <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">← Mis supermercados</a>
+</div>
+
+{% if flags.supermercados_publicos %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <span>
+        {% if super.publico %}
+        <span class="badge bg-success">🌍 Público · ❤️ {{ super.total_likes }}</span>
+        {% else %}
+        <span class="badge bg-secondary">Privado</span>
+        {% endif %}
+    </span>
+    <span>
+        <button class="btn btn-sm {% if super.publico %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                onclick="alternarPublicacion({{ super.id }}, this)">
+            {% if super.publico %}Despublicar{% else %}🌍 Publicar{% endif %}
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="eliminarSupermercado({{ super.id }}, {{ super.publico|yesno:'true,false' }})">🗑️ Eliminar</button>
+    </span>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" id="nuevo-pasillo-{{ super.id }}"
+                   placeholder="Nuevo pasillo...">
+            <button class="btn btn-success" onclick="crearPasillo({{ super.id }})">+ Añadir pasillo</button>
+        </div>
+
+        <ul class="list-group" id="pasillos-{{ super.id }}" data-super="{{ super.id }}">
+            {% for pasillo in super.pasillos.all %}
+            <li class="list-group-item pasillo-row" data-id="{{ pasillo.id }}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>☰ {{ pasillo.orden }}. {{ pasillo.nombre }}</span>
+                    <span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="renombrarPasillo({{ pasillo.id }}, '{{ pasillo.nombre|escapejs }}')">✎</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarPasillo({{ pasillo.id }}, this)">✕</button>
+                    </span>
+                </div>
+                <div class="mb-1">
+                    {% for kw in pasillo.keywords.all %}
+                    <span class="badge bg-secondary keyword-badge" id="kw-{{ kw.id }}">
+                        {{ kw.palabra }}
+                        <a href="#" onclick="eliminarKeyword({{ kw.id }}); return false;" class="text-white text-decoration-none">✕</a>
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="input-group input-group-sm">
+                    <input type="text" placeholder="Añadir palabra clave..." id="kw-input-{{ pasillo.id }}">
+                    <button class="btn btn-outline-primary" onclick="crearKeyword({{ pasillo.id }})">+</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+
+    </div>
+</div>
+
+</div>
+
+{% bootstrap_javascript %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+async function alternarPublicacion(superId, btn) {
+    const resp = await fetch(`/configuracion/supermercado/publicar/${superId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+async function eliminarSupermercado(superId, esPublico) {
+    if (esPublico) {
+        alert('Está publicado en Explorar. Despublícalo primero para poder eliminarlo.');
+        return;
+    }
+    if (!confirm('¿Eliminar este supermercado y todos sus pasillos/keywords? No se puede deshacer.')) return;
+    const resp = await fetch(`/configuracion/supermercado/eliminar/${superId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) {
+        window.location.href = "{% url 'compra:configuracion' %}";
+    } else {
+        const data = await resp.json();
+        alert(data.error || 'No se pudo eliminar');
+    }
+}
+
+async function crearPasillo(superId) {
+    const input = document.getElementById(`nuevo-pasillo-${superId}`);
+    const nombre = input.value.trim();
+    if (!nombre) return;
+    const resp = await fetch(`/configuracion/pasillo/crear/${superId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function renombrarPasillo(pasilloId, nombreActual) {
+    const nombre = prompt('Nuevo nombre del pasillo:', nombreActual);
+    if (!nombre || !nombre.trim() || nombre.trim() === nombreActual) return;
+    const resp = await fetch(`/configuracion/pasillo/renombrar/${pasilloId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ nombre: nombre.trim() })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function eliminarPasillo(pasilloId, btn) {
+    if (!confirm('¿Eliminar este pasillo? Los productos quedarán sin asignar.')) return;
+    const resp = await fetch(`/configuracion/pasillo/eliminar/${pasilloId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+async function crearKeyword(pasilloId) {
+    const input = document.getElementById(`kw-input-${pasilloId}`);
+    const palabra = input.value.trim();
+    if (!palabra) return;
+    const resp = await fetch(`/configuracion/keyword/crear/${pasilloId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ palabra })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function eliminarKeyword(keywordId) {
+    const resp = await fetch(`/configuracion/keyword/eliminar/${keywordId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    if (resp.ok) location.reload();
+}
+
+// Reordenar pasillos arrastrando (drag & drop simple, escritorio)
+document.querySelectorAll('[id^="pasillos-"]').forEach(lista => {
+    let dragged = null;
+    lista.querySelectorAll('.pasillo-row').forEach(row => {
+        row.draggable = true;
+        row.addEventListener('dragstart', () => dragged = row);
+        row.addEventListener('dragover', e => e.preventDefault());
+        row.addEventListener('drop', async e => {
+            e.preventDefault();
+            if (dragged && dragged !== row) {
+                row.parentNode.insertBefore(dragged, row.nextSibling);
+                const superId = lista.dataset.super;
+                const orden = [...lista.querySelectorAll('.pasillo-row')].map(r => r.dataset.id);
+                await fetch(`/configuracion/pasillo/reordenar/${superId}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                    body: JSON.stringify({ orden })
+                });
+            }
+        });
+    });
+});
+</script>
+</body>
+</html>
