@@ -18,6 +18,7 @@ urlpatterns = [
     path('configuracion/supermercado/crear/', views.crear_supermercado, name='crear_supermercado'),
     path('configuracion/supermercado/publicar/<int:supermercado_id>/', views.alternar_publicacion, name='alternar_publicacion'),
     path('configuracion/supermercado/eliminar/<int:supermercado_id>/', views.eliminar_supermercado, name='eliminar_supermercado'),
+    path('configuracion/supermercado/importar-bloque/<int:supermercado_id>/', views.importar_bloque_pasillos, name='importar_bloque_pasillos'),
     path('configuracion/<int:supermercado_id>/', views.SupermercadoDetalleView.as_view(), name='supermercado_detalle'),
     path('configuracion/pasillo/crear/<int:supermercado_id>/', views.crear_pasillo, name='crear_pasillo'),
     path('configuracion/pasillo/renombrar/<int:pasillo_id>/', views.renombrar_pasillo, name='renombrar_pasillo'),

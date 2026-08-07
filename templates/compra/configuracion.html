@@ -32,7 +32,19 @@ body { background-color: #f8f9fa; }
                    placeholder="Nombre del supermercado nuevo...">
             <button class="btn btn-success" onclick="crearSupermercado()">+ Crear supermercado</button>
         </div>
-        <div class="form-text">Se crea con los pasillos y palabras clave de una plantilla base, para no empezar de cero — luego los ajustas a tu gusto.</div>
+        <div class="form-text mb-2">Por defecto se crea con los pasillos y palabras clave de una plantilla base, para no empezar de cero.</div>
+
+        <details>
+            <summary class="text-primary small" style="cursor:pointer">¿Prefieres partir de tu propia lista en vez de la plantilla?</summary>
+            <div class="mt-2">
+                <textarea class="form-control" id="nuevo-super-bloque" rows="5"
+                    placeholder="Escribe o dicta (con el micrófono del teclado) un pasillo por línea:
+
+Perfumería: champú, gel, desodorante
+Panadería: pan, bollería, cereales"></textarea>
+                <div class="form-text">Si rellenas esto, se usa en vez de la plantilla base.</div>
+            </div>
+        </details>
     </div>
 </div>
 
@@ -67,10 +79,11 @@ async function crearSupermercado() {
     const input = document.getElementById('nuevo-super-nombre');
     const nombre = input.value.trim();
     if (!nombre) return;
+    const bloque = document.getElementById('nuevo-super-bloque').value.trim();
     const resp = await fetch(`/configuracion/supermercado/crear/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({ nombre })
+        body: JSON.stringify({ nombre, bloque })
     });
     if (resp.ok) {
         const data = await resp.json();

@@ -4,6 +4,49 @@ import PIL.ImageOps
 from django.conf import settings
 
 
+def importar_bloque(texto, supermercado):
+    """
+    Crea pasillos (y sus keywords) a partir de texto pegado o dictado,
+    uno por línea, formato 'Nombre del pasillo: palabra1, palabra2...'.
+    Las palabras clave son opcionales (una línea sin ':' crea el pasillo
+    sin keywords). Los pasillos se añaden a continuación de los que ya
+    tenga el supermercado. Devuelve cuántos pasillos se crearon.
+    """
+    from .models import Pasillo, Keyword
+
+    orden = supermercado.pasillos.count() + 1
+    creados = 0
+
+    for linea in texto.splitlines():
+        linea = linea.strip()
+        if not linea:
+            continue
+
+        if ':' in linea:
+            nombre, resto = linea.split(':', 1)
+            palabras = [p.strip().lower() for p in resto.split(',') if p.strip()]
+        else:
+            nombre, palabras = linea, []
+
+        nombre = nombre.strip()
+        if not nombre:
+            continue
+
+        pasillo = Pasillo.objects.create(
+            supermercado=supermercado,
+            nombre=nombre,
+            orden=orden,
+        )
+        orden += 1
+        creados += 1
+
+        if palabras:
+            keywords = [Keyword(pasillo=pasillo, palabra=p) for p in palabras]
+            Keyword.objects.bulk_create(keywords, ignore_conflicts=True)
+
+    return creados
+
+
 def copiar_pasillos_keywords(origen, destino):
     """Copia los pasillos y keywords de un Supermercado a otro ya existente."""
     from .models import Pasillo, Keyword

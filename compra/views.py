@@ -306,11 +306,12 @@ class SupermercadoDetalleView(View):
 @login_required
 @require_POST
 def crear_supermercado(request):
-    from .services import plantilla_por_defecto, copiar_pasillos_keywords
+    from .services import plantilla_por_defecto, copiar_pasillos_keywords, importar_bloque
 
     data = json.loads(request.body)
     nombre = data.get('nombre', '').strip()
     direccion = data.get('direccion', '').strip()
+    bloque = data.get('bloque', '').strip()
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
@@ -324,15 +325,36 @@ def crear_supermercado(request):
         direccion=direccion,
     )
 
-    plantilla = plantilla_por_defecto()
-    if plantilla:
-        copiar_pasillos_keywords(plantilla, supermercado)
+    if bloque:
+        importar_bloque(bloque, supermercado)
+    else:
+        plantilla = plantilla_por_defecto()
+        if plantilla:
+            copiar_pasillos_keywords(plantilla, supermercado)
 
     return JsonResponse({
         'ok': True,
         'id': supermercado.id,
         'nombre': supermercado.nombre,
     })
+
+
+@login_required
+@require_POST
+def importar_bloque_pasillos(request, supermercado_id):
+    from .services import importar_bloque
+
+    supermercado = get_object_or_404(
+        Supermercado, id=supermercado_id, usuario=request.user
+    )
+    data = json.loads(request.body)
+    bloque = data.get('bloque', '').strip()
+
+    if not bloque:
+        return JsonResponse({'error': 'Pega o dicta al menos un pasillo'}, status=400)
+
+    creados = importar_bloque(bloque, supermercado)
+    return JsonResponse({'ok': True, 'creados': creados})
 
 
 @login_required
@@ -482,6 +504,16 @@ def reordenar_pasillos(request, supermercado_id):
     )
     data = json.loads(request.body)
     orden_ids = data.get('orden', [])
+
+    # Primero a un rango temporal alto: si se actualizara directamente al
+    # orden final, un pasillo podía chocar con el 'orden' que todavía
+    # tenía otro pendiente de actualizar (unique_together supermercado+orden).
+    OFFSET = 100000
+    for posicion, pasillo_id in enumerate(orden_ids, start=1):
+        Pasillo.objects.filter(
+            id=pasillo_id,
+            supermercado=supermercado
+        ).update(orden=OFFSET + posicion)
 
     for posicion, pasillo_id in enumerate(orden_ids, start=1):
         Pasillo.objects.filter(

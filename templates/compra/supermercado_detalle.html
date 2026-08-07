@@ -44,11 +44,23 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 <div class="card mb-4">
     <div class="card-body">
 
-        <div class="input-group mb-3">
+        <div class="input-group mb-2">
             <input type="text" class="form-control" id="nuevo-pasillo-{{ super.id }}"
                    placeholder="Nuevo pasillo...">
             <button class="btn btn-success" onclick="crearPasillo({{ super.id }})">+ Añadir pasillo</button>
         </div>
+
+        <details class="mb-3">
+            <summary class="text-primary small" style="cursor:pointer">Añadir varios pasillos de golpe (pegar o dictar)</summary>
+            <div class="mt-2">
+                <textarea class="form-control" id="bloque-{{ super.id }}" rows="4"
+                    placeholder="Un pasillo por línea:
+
+Bebidas: agua, refrescos, cerveza
+Limpieza: lejía, detergente"></textarea>
+                <button class="btn btn-outline-success btn-sm mt-2" onclick="importarBloque({{ super.id }})">📥 Importar</button>
+            </div>
+        </details>
 
         <ul class="list-group" id="pasillos-{{ super.id }}" data-super="{{ super.id }}">
             {% for pasillo in super.pasillos.all %}
@@ -56,6 +68,8 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span>☰ {{ pasillo.orden }}. {{ pasillo.nombre }}</span>
                     <span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="moverPasillo({{ super.id }}, {{ pasillo.id }}, -1)" {% if forloop.first %}disabled{% endif %}>▲</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="moverPasillo({{ super.id }}, {{ pasillo.id }}, 1)" {% if forloop.last %}disabled{% endif %}>▼</button>
                         <button class="btn btn-sm btn-outline-secondary" onclick="renombrarPasillo({{ pasillo.id }}, '{{ pasillo.nombre|escapejs }}')">✎</button>
                         <button class="btn btn-sm btn-outline-danger" onclick="eliminarPasillo({{ pasillo.id }}, this)">✕</button>
                     </span>
@@ -109,6 +123,45 @@ async function eliminarSupermercado(superId, esPublico) {
         const data = await resp.json();
         alert(data.error || 'No se pudo eliminar');
     }
+}
+
+async function importarBloque(superId) {
+    const textarea = document.getElementById(`bloque-${superId}`);
+    const bloque = textarea.value.trim();
+    if (!bloque) return;
+    const resp = await fetch(`/configuracion/supermercado/importar-bloque/${superId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ bloque })
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        const data = await resp.json();
+        alert(data.error || 'No se pudo importar');
+    }
+}
+
+async function moverPasillo(superId, pasilloId, delta) {
+    const lista = document.getElementById(`pasillos-${superId}`);
+    const filas = [...lista.querySelectorAll('.pasillo-row')];
+    const idx = filas.findIndex(f => f.dataset.id === String(pasilloId));
+    const nuevoIdx = idx + delta;
+    if (nuevoIdx < 0 || nuevoIdx >= filas.length) return;
+
+    if (delta < 0) {
+        lista.insertBefore(filas[idx], filas[nuevoIdx]);
+    } else {
+        lista.insertBefore(filas[nuevoIdx], filas[idx]);
+    }
+
+    const orden = [...lista.querySelectorAll('.pasillo-row')].map(r => r.dataset.id);
+    await fetch(`/configuracion/pasillo/reordenar/${superId}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ orden })
+    });
+    location.reload();
 }
 
 async function crearPasillo(superId) {
