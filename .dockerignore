@@ -1,0 +1,27 @@
+# Secretos y datos locales: nunca deben entrar en la imagen
+.env
+.env.*
+*.sql
+backups/
+auditorias/
+contexto.md
+
+# Entorno de desarrollo
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Artefactos de build/estáticos
+staticfiles/
+media/
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# Documentación y notas locales (LICENSE y README sí van en la imagen)
+presentacion.md
+INFORME_AUDITORIA*.md

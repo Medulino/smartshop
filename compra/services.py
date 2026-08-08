@@ -56,7 +56,7 @@ def importar_bloque(texto, supermercado):
         if ':' in linea:
             nombre, resto = linea.split(':', 1)
             palabras = [
-                p.strip().lower().rstrip('.,;')
+                p.strip().lower().rstrip('.,;')[:100]
                 for p in resto.split(',')
                 if p.strip()
             ][:MAX_KEYWORDS_POR_PASILLO]
@@ -64,7 +64,7 @@ def importar_bloque(texto, supermercado):
         else:
             nombre, palabras = linea, []
 
-        nombre = nombre.strip()
+        nombre = nombre.strip()[:200]
         if not nombre:
             continue
 
@@ -194,7 +194,7 @@ def estructurar_pasillos_con_ia(descripcion_libre):
 
     modelos = [
         'gemini-3-flash-preview',
-        'gemini-robotics-er-1.6-preview',
+        'gemini-2.5-flash',
     ]
 
     prompt = """
@@ -224,7 +224,9 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     for nombre_modelo in modelos:
         try:
             model = genai.GenerativeModel(model_name=nombre_modelo)
-            response = model.generate_content(prompt)
+            response = model.generate_content(
+                prompt, request_options={'timeout': 60}
+            )
             if response.text:
                 return response.text.strip(), None
         except Exception as e:
@@ -240,7 +242,7 @@ def leer_lista_desde_imagen(imagen_file):
 
     modelos = [
     'gemini-3-flash-preview',
-    'gemini-robotics-er-1.6-preview',
+    'gemini-2.5-flash',
     ]
 
     prompt = """
@@ -257,7 +259,9 @@ def leer_lista_desde_imagen(imagen_file):
     for nombre_modelo in modelos:
         try:
             model = genai.GenerativeModel(model_name=nombre_modelo)
-            response = model.generate_content([prompt, img])
+            response = model.generate_content(
+                [prompt, img], request_options={'timeout': 60}
+            )
             if response.text:
                 texto = response.text.replace('\n', ',').replace(';', ',')
                 productos = [

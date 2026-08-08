@@ -1,3 +1,4 @@
+from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -11,6 +12,15 @@ import json
 from .utils import normalizar as _normalizar
 from usuarios.models import FeatureFlag
 from django.conf import settings
+
+
+def _json_body(request):
+    """Devuelve el body parseado como dict o None si el JSON es inválido."""
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def inferir_pasillo(nombre_producto, supermercado):
@@ -109,20 +119,31 @@ class ListaCompraView(View):
 @login_required
 @require_POST
 def añadir_producto(request):
-    data = json.loads(request.body)
-    texto = data.get('nombre', '').strip()
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    texto = str(data.get('nombre') or '').strip()[:5000]
     lista_id = data.get('lista_id')
 
     if not texto or not lista_id:
         return JsonResponse({'error': 'Datos incompletos'}, status=400)
 
+    try:
+        lista_id = int(lista_id)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'lista_id inválido'}, status=400)
+
     lista = get_object_or_404(Lista, id=lista_id, usuario=request.user)
 
     nombres = [
-        p.strip()
+        p.strip()[:200]
         for p in texto.replace('\n', ',').replace(';', ',').split(',')
         if p.strip()
-    ]
+    ][:50]
 
     items_creados = []
     for nombre in nombres:
@@ -187,7 +208,9 @@ def vaciar_marcados(request, lista_id):
 @login_required
 @require_POST
 def asignar_pasillo(request, item_id):
-    data = json.loads(request.body)
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
     pasillo_id = data.get('pasillo_id')
 
     if not pasillo_id:
@@ -238,6 +261,17 @@ def usuario_supero_limite_fotos(usuario, limite=10, ventana_segundos=3600):
     return usuario_supero_limite(usuario, 'fotos', limite, ventana_segundos)
 
 
+def _rechazo_limite_escritura(request, limite=300, ventana_segundos=3600):
+    """Rate limit por usuario para los endpoints que crean datos en la BD
+    (productos, pasillos, plantillas, copias de supermercados). Devuelve la
+    respuesta 429 si se supera, o None si el usuario puede seguir."""
+    if usuario_supero_limite(request.user, 'escritura', limite, ventana_segundos):
+        return JsonResponse({
+            'error': f'Has alcanzado el límite de {limite} escrituras por hora.'
+        }, status=429)
+    return None
+
+
 @login_required
 @require_POST
 def analizar_foto(request):
@@ -246,6 +280,10 @@ def analizar_foto(request):
 
     if not lista_id or not foto:
         return JsonResponse({'error': 'Faltan datos'}, status=400)
+
+    peso = int(request.META.get('CONTENT_LENGTH') or 0)
+    if peso > 16 * 1024 * 1024:
+        return JsonResponse({'error': 'La foto supera los 16MB.'}, status=413)
 
     if usuario_supero_limite_fotos(request.user):
         return JsonResponse({
@@ -321,10 +359,15 @@ def crear_supermercado(request):
         importar_bloque, estructurar_pasillos_con_ia,
     )
 
-    data = json.loads(request.body)
-    nombre = data.get('nombre', '').strip()
-    direccion = data.get('direccion', '').strip()
-    descripcion = data.get('descripcion', '').strip()
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    nombre = str(data.get('nombre') or '').strip()[:200]
+    direccion = str(data.get('direccion') or '').strip()[:300]
+    descripcion = str(data.get('descripcion') or '').strip()[:10000]
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
@@ -367,11 +410,16 @@ def crear_supermercado(request):
 def importar_bloque_pasillos(request, supermercado_id):
     from .services import importar_bloque, estructurar_pasillos_con_ia
 
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     supermercado = get_object_or_404(
         Supermercado, id=supermercado_id, usuario=request.user
     )
-    data = json.loads(request.body)
-    descripcion = data.get('descripcion', '').strip()
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    descripcion = str(data.get('descripcion') or '').strip()[:3000]
 
     if not descripcion:
         return JsonResponse({'error': 'Cuéntanos qué pasillos quieres añadir'}, status=400)
@@ -436,8 +484,16 @@ class ExplorarSupermercadosView(View):
             Supermercado.objects.filter(usuario=request.user).values_list('nombre', flat=True)
         )
 
+        paginator = Paginator(supermercados, 20)
+        pagina = request.GET.get('pagina', 1)
+        try:
+            pagina = int(pagina)
+        except (TypeError, ValueError):
+            pagina = 1
+        pagina = max(1, min(pagina, paginator.num_pages))
+
         return render(request, self.template_name, {
-            'supermercados': supermercados,
+            'supermercados': paginator.get_page(pagina),
             'ya_tengo': ya_tengo,
         })
 
@@ -467,6 +523,9 @@ def usar_supermercado_publico(request, supermercado_id):
     """Copia un supermercado público (pasillos y keywords) a la cuenta del usuario."""
     from .services import duplicar_supermercado
 
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     origen = get_object_or_404(Supermercado, id=supermercado_id, publico=True)
     nuevo = duplicar_supermercado(origen, request.user)
     return JsonResponse({'ok': True, 'id': nuevo.id, 'nombre': nuevo.nombre})
@@ -475,11 +534,16 @@ def usar_supermercado_publico(request, supermercado_id):
 @login_required
 @require_POST
 def crear_pasillo(request, supermercado_id):
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     supermercado = get_object_or_404(
         Supermercado, id=supermercado_id, usuario=request.user
     )
-    data = json.loads(request.body)
-    nombre = data.get('nombre', '').strip()
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    nombre = str(data.get('nombre') or '').strip()[:200]
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
@@ -511,8 +575,10 @@ def renombrar_pasillo(request, pasillo_id):
     pasillo = get_object_or_404(
         Pasillo, id=pasillo_id, supermercado__usuario=request.user
     )
-    data = json.loads(request.body)
-    nombre = data.get('nombre', '').strip()
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    nombre = str(data.get('nombre') or '').strip()[:200]
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
@@ -559,11 +625,19 @@ def reordenar_pasillos(request, supermercado_id):
     Recibe una lista de IDs en el nuevo orden y actualiza
     el campo 'orden' de cada pasillo.
     """
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     supermercado = get_object_or_404(
         Supermercado, id=supermercado_id, usuario=request.user
     )
-    data = json.loads(request.body)
-    orden_ids = data.get('orden', [])
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    orden_ids = data.get('orden', []) or []
+    if not isinstance(orden_ids, list):
+        return JsonResponse({'error': 'orden debe ser una lista'}, status=400)
+    orden_ids = [i for i in orden_ids[:200] if isinstance(i, int)]
 
     # Primero a un rango temporal alto: si se actualizara directamente al
     # orden final, un pasillo podía chocar con el 'orden' que todavía
@@ -587,11 +661,16 @@ def reordenar_pasillos(request, supermercado_id):
 @login_required
 @require_POST
 def crear_keyword(request, pasillo_id):
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     pasillo = get_object_or_404(
         Pasillo, id=pasillo_id, supermercado__usuario=request.user
     )
-    data = json.loads(request.body)
-    palabra = _normalizar(data.get('palabra', ''))
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    palabra = _normalizar(data.get('palabra', ''))[:60]
 
     if not palabra:
         return JsonResponse({'error': 'Falta la palabra'}, status=400)
@@ -619,9 +698,14 @@ def eliminar_keyword(request, keyword_id):
 @login_required
 @require_POST
 def guardar_como_plantilla(request, lista_id):
+    resp = _rechazo_limite_escritura(request)
+    if resp:
+        return resp
     lista = get_object_or_404(Lista, id=lista_id, usuario=request.user)
-    data = json.loads(request.body)
-    nombre = data.get('nombre', '').strip()
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    nombre = str(data.get('nombre') or '').strip()[:100]
 
     if not nombre:
         return JsonResponse({'error': 'Falta el nombre'}, status=400)
@@ -724,6 +808,11 @@ def exportar_pdf(request, lista_id):
     from django.template.loader import render_to_string
     from django.http import HttpResponse
     from weasyprint import HTML
+
+    if usuario_supero_limite(request.user, 'pdf_export', limite=20, ventana_segundos=3600):
+        from django.contrib import messages
+        messages.error(request, 'Has alcanzado el límite de 20 exportaciones a PDF por hora.')
+        return HttpResponse(status=429)
 
     lista = get_object_or_404(Lista, id=lista_id, usuario=request.user)
     items = lista.items.select_related('pasillo').order_by(

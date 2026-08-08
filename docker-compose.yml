@@ -29,6 +29,9 @@ services:
     volumes:
       - static_files:/app/staticfiles
       - media_files:/app/media
+    # Límites de recursos para que un worker atascado no consuma el host
+    mem_limit: 1g
+    cpus: 2
 
   backup:
     image: postgres:17
@@ -46,8 +49,11 @@ services:
         condition: service_healthy
     entrypoint: >
       sh -c "while true; do
-        pg_dump -h db -U ${DB_USER} ${DB_NAME} > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql;
-        echo 'Backup realizado';
+        umask 077;
+        f=/backups/backup_$$(date +%Y%m%d_%H%M%S).sql;
+        pg_dump -h db -U ${DB_USER} ${DB_NAME} > \"$$f\" && test -s \"$$f\" && echo \"Backup OK: $$f\" || { echo \"Backup FALLIDO: $$f\"; rm -f \"$$f\"; };
+        find /backups -name 'backup_*.sql' -mtime +30 -delete;
+        docker exec compra_web python manage.py limpiar_intentos || echo 'limpiar_intentos fallido';
         sleep 86400;
       done"
 

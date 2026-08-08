@@ -1,5 +1,6 @@
 .env
 backups/
+auditorias/
 staticfiles/
 __pycache__/
 *.pyc

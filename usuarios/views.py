@@ -38,7 +38,9 @@ class RegistroView(View):
         errores = []
         if not username or len(username) < 3:
             errores.append('El nombre de usuario debe tener al menos 3 caracteres.')
-        if not email or '@' not in email:
+        if len(username) > 150:
+            errores.append('El nombre de usuario es demasiado largo.')
+        if not email or '@' not in email or len(email) > 254:
             errores.append('El email no es válido.')
         if len(password1) < 8:
             errores.append('La contraseña debe tener al menos 8 caracteres.')
@@ -121,7 +123,7 @@ class LoginView(View):
         return render(request, self.template_name)
 
     def post(self, request):
-        email = request.POST.get('email', '').strip().lower()
+        email = request.POST.get('email', '').strip().lower()[:254]
         password = request.POST.get('password', '')
 
         ip = seguridad.obtener_ip(request)

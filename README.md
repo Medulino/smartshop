@@ -1,6 +1,6 @@
 # 🛒 Compra Inteligente
 
-🌐 **Demo en producción:** https://smartshop-jc36.onrender.com
+🌐 **Estado de producción:** la app estuvo publicada en Render (`https://smartshop-jc36.onrender.com`) durante la fase de despliegue del proyecto, pero esa instancia ya no está activa. El proyecto se ejecuta actualmente en local con Docker Compose.
 
 Aplicación web desarrollada como proyecto final de curso. 
 Permite gestionar listas de la compra de forma inteligente, ordenando los productos según los pasillos del supermercado del usuario y leyendo listas manuscritas mediante IA para una ruta optimizada ahorrando tiempo
@@ -134,4 +134,6 @@ para el texto completo.
 -Sistema de likes para los supermercados creados por los usuarios
 
 -Seleccionar recetas disponibles en la aplicación, para cuántos comensales y que la app añada a la lista los ingredientes y la cantidad a comprar.
+
+-Archivo de tickets de compra: fotografía/almacenaje de tickets y sección de informes de gastos con búsquedas combinables por supermercado, franquicia y fechas, para consultar tickets antiguos.
 

@@ -54,6 +54,24 @@ body { background-color: #f8f9fa; }
 </div>
 {% endfor %}
 
+{% if supermercados.has_other_pages %}
+<nav class="mt-4" aria-label="Paginación">
+    <ul class="pagination justify-content-center">
+        {% if supermercados.has_previous %}
+        <li class="page-item"><a class="page-link" href="?pagina={{ supermercados.previous_page_number }}">← Anterior</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">← Anterior</span></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">{{ supermercados.number }} / {{ supermercados.paginator.num_pages }}</span></li>
+        {% if supermercados.has_next %}
+        <li class="page-item"><a class="page-link" href="?pagina={{ supermercados.next_page_number }}">Siguiente →</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Siguiente →</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 </div>
 
 {% bootstrap_javascript %}

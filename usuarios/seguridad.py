@@ -27,16 +27,32 @@ INTENTOS_POR_MES = 1_000_000
 def obtener_ip(request):
     """IP real del cliente. Solo se confía en X-Forwarded-For si la conexión
     proviene de un proxy de TRUSTED_PROXIES o llega por HTTPS (producción tras
-    proxy). En otro caso se usa REMOTE_ADDR, que el cliente no puede
-    falsificar (evita esquivar los rate limits con un header inventado)."""
+    proxy y con CONFIAR_XFF_EN_HTTPS activo). En otro caso se usa REMOTE_ADDR,
+    que el cliente no puede falsificar (evita esquivar los rate limits con un
+    header inventado)."""
     remoto = request.META.get('REMOTE_ADDR', 'desconocida')
     xff = request.META.get('HTTP_X_FORWARDED_FOR')
-    if xff and (remoto in settings.TRUSTED_PROXIES or request.is_secure()):
-        return xff.split(',')[0].strip() or remoto
+    if not xff:
+        return remoto
+    proxy_confiable = remoto in settings.TRUSTED_PROXIES
+    https_tras_proxy = request.is_secure() and settings.CONFIAR_XFF_EN_HTTPS
+    if proxy_confiable or https_tras_proxy:
+        # El proxy añade la IP real al FINAL de la cabecera; la izquierda es
+        # la que puede inventar el atacante. Usar la de la derecha evita que
+        # un cliente falsifique la IP y esquive los rate limits.
+        return xff.split(',')[-1].strip() or remoto
     return remoto
 
 
+def _acotar(base, max_len=255):
+    """Evita que un valor de entrada gigante (p.ej. un email de 300 chars)
+    haga saltar el límite varchar(255) de IntentoFallo.base y rompa la
+    petición con un 500."""
+    return base[:max_len]
+
+
 def _intentos(base):
+    base = _acotar(base)
     try:
         return IntentoFallo.objects.get(base=base).intentos
     except IntentoFallo.DoesNotExist:
@@ -45,6 +61,7 @@ def _intentos(base):
 
 def _registrar(base, ventana_segundos):
     """Suma 1 al contador de `base` y devuelve el total acumulado."""
+    base = _acotar(base)
     registro, creado = IntentoFallo.objects.get_or_create(
         base=base, defaults={'intentos': 1}
     )

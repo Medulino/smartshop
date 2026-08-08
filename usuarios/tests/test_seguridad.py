@@ -203,4 +203,19 @@ class ObtenerIpTests(TestCase):
     def test_usa_xff_sobre_https(self):
         request = self._request('10.0.0.1', xff='6.6.6.6')
         request.META['wsgi.url_scheme'] = 'https'
-        self.assertEqual(seguridad.obtener_ip(request), '6.6.6.6')
+        with self.settings(CONFIAR_XFF_EN_HTTPS=True):
+            self.assertEqual(seguridad.obtener_ip(request), '6.6.6.6')
+
+    def test_usa_la_ip_real_de_la_derecha_del_xff(self):
+        # Un proxy añade la IP real al final de XFF; la izquierda puede ser
+        # inventada por el atacante. Siempre debe usarse la de la derecha.
+        request = self._request('10.0.0.1', xff='6.6.6.6, 10.0.0.1')
+        request.META['wsgi.url_scheme'] = 'https'
+        with self.settings(CONFIAR_XFF_EN_HTTPS=True):
+            self.assertEqual(seguridad.obtener_ip(request), '10.0.0.1')
+
+    def test_ignora_xff_cuando_confiarse_esta_desactivado(self):
+        request = self._request('10.0.0.1', xff='6.6.6.6')
+        request.META['wsgi.url_scheme'] = 'https'
+        with self.settings(CONFIAR_XFF_EN_HTTPS=False):
+            self.assertEqual(seguridad.obtener_ip(request), '10.0.0.1')

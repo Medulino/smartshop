@@ -188,9 +188,22 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # IA
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-# Proxies de confianza (p.ej. nginx o Render) que reenvían X-Forwarded-For.
+# Proxies de confianza (p.ej. nginx) que reenvían X-Forwarded-For.
 # Vacío = sin proxy: se usa REMOTE_ADDR, que el cliente no puede falsificar.
 TRUSTED_PROXIES = [p.strip() for p in os.getenv('TRUSTED_PROXIES', '').split(',') if p.strip()]
+
+# Cuando la app va detrás de un proxy TLS (HTTPS), se confía en
+# X-Forwarded-For aunque el proxy no esté en TRUSTED_PROXIES. Desactivar
+# solo si la app pudiera recibir peticiones directas sin proxy (ahí un
+# X-Forwarded-Proto: https falso permitiría suplantar la IP y saltarse
+# los rate limits). En local/LAN (HTTP) no tiene efecto.
+CONFIAR_XFF_EN_HTTPS = os.getenv('CONFIAR_XFF_EN_HTTPS', 'True') == 'True'
+
+# Límites de tamaño de subidas/body: protegen frente a DoS por payloads
+# gigantes. Las fotos se validan además en redimensionar_imagen (15MB) y con
+# un rechazo temprano por Content-Length en analizar_foto (16MB).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024
 
 
 # Seguridad de transporte (HTTPS)
