@@ -1,8 +1,17 @@
 import io
+import logging
+
 import PIL.Image
 import PIL.ImageOps
 from django.conf import settings
 from .utils import normalizar
+
+logger = logging.getLogger(__name__)
+
+# Topes a la salida de la IA para evitar abusos (import_bloque se alimenta
+# con texto estructurado, tanto pegado por el usuario como generado por Gemini).
+MAX_PASILLOS_IMPORTACION = 100
+MAX_KEYWORDS_POR_PASILLO = 30
 
 
 def sugerir_categorias(nombre_pasillo):
@@ -39,7 +48,7 @@ def importar_bloque(texto, supermercado):
     orden = supermercado.pasillos.count() + 1
     creados = 0
 
-    for linea in texto.splitlines():
+    for linea in texto.splitlines()[:MAX_PASILLOS_IMPORTACION]:
         linea = linea.strip()
         if not linea:
             continue
@@ -50,7 +59,7 @@ def importar_bloque(texto, supermercado):
                 p.strip().lower().rstrip('.,;')
                 for p in resto.split(',')
                 if p.strip()
-            ]
+            ][:MAX_KEYWORDS_POR_PASILLO]
             palabras = [p for p in palabras if p]
         else:
             nombre, palabras = linea, []
@@ -219,10 +228,10 @@ def estructurar_pasillos_con_ia(descripcion_libre):
             if response.text:
                 return response.text.strip(), None
         except Exception as e:
-            ultimo_error = str(e)
+            logger.warning('Error de IA en estructurar_pasillos_con_ia (%s): %s', nombre_modelo, e)
             continue
 
-    return None, f"El servicio de IA no está disponible ahora mismo. Inténtalo más tarde. ({ultimo_error[:100]})"
+    return None, "El servicio de IA no está disponible ahora mismo. Inténtalo más tarde."
 
 
 def leer_lista_desde_imagen(imagen_file):
@@ -255,10 +264,10 @@ def leer_lista_desde_imagen(imagen_file):
                     p.strip().lower()
                     for p in texto.split(',')
                     if p.strip() and len(p.strip()) > 1
-                ]
+                ][:MAX_KEYWORDS_POR_PASILLO]
                 return productos, None
         except Exception as e:
-            ultimo_error = str(e)
+            logger.warning('Error de IA en leer_lista_desde_imagen (%s): %s', nombre_modelo, e)
             continue
 
-    return [], f"El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde. ({ultimo_error[:100]})"
+    return [], "El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde."

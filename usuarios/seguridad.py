@@ -8,6 +8,7 @@ de tiempo: si pasa la ventana desde el último uso, el contador se reinicia.
 """
 from datetime import timedelta
 
+from django.conf import settings
 from django.utils import timezone
 
 from .models import IntentoFallo
@@ -24,11 +25,15 @@ INTENTOS_POR_MES = 1_000_000
 
 
 def obtener_ip(request):
-    """IP real del cliente, teniendo en cuenta proxies (X-Forwarded-For)."""
+    """IP real del cliente. Solo se confía en X-Forwarded-For si la conexión
+    proviene de un proxy de TRUSTED_PROXIES o llega por HTTPS (producción tras
+    proxy). En otro caso se usa REMOTE_ADDR, que el cliente no puede
+    falsificar (evita esquivar los rate limits con un header inventado)."""
+    remoto = request.META.get('REMOTE_ADDR', 'desconocida')
     xff = request.META.get('HTTP_X_FORWARDED_FOR')
-    if xff:
-        return xff.split(',')[0].strip() or 'desconocida'
-    return request.META.get('REMOTE_ADDR', 'desconocida')
+    if xff and (remoto in settings.TRUSTED_PROXIES or request.is_secure()):
+        return xff.split(',')[0].strip() or remoto
+    return remoto
 
 
 def _intentos(base):

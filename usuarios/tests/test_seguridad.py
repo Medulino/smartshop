@@ -1,6 +1,7 @@
-from django.test import TestCase
+from django.test import TestCase, RequestFactory
 from django.urls import reverse
 
+from usuarios import seguridad
 from usuarios.models import Usuario, IntentoFallo
 from compra.tests.utils import crear_usuario
 
@@ -156,17 +157,50 @@ class RegistroRateLimitTests(TestCase):
 class AdminLoginRateLimitTests(TestCase):
     """El login del admin de Django también está limitado por IP."""
 
+    def setUp(self):
+        self.url_login_admin = reverse('admin:login')
+
     def test_bloquea_el_login_del_admin_tras_10_intentos(self):
         datos = {'username': 'admin@test.com', 'password': 'incorrecta'}
         for _ in range(10):
-            self.client.post('/admin/login/', datos)
-        respuesta = self.client.post('/admin/login/', datos)
+            self.client.post(self.url_login_admin, datos)
+        respuesta = self.client.post(self.url_login_admin, datos)
         self.assertEqual(respuesta.status_code, 429)
 
     def test_las_demas_peticiones_post_no_se_ven_afectadas(self):
         for _ in range(12):
-            self.client.post('/admin/login/', {
+            self.client.post(self.url_login_admin, {
                 'username': 'admin@test.com', 'password': 'incorrecta',
             })
         respuesta = self.client.get(reverse('usuarios:login'))
         self.assertEqual(respuesta.status_code, 200)
+
+
+class ObtenerIpTests(TestCase):
+    """obtener_ip solo confía en X-Forwarded-For si viene de un proxy de fiar
+    o de una conexión HTTPS; sobre HTTP se usa REMOTE_ADDR (infalsificable)."""
+
+    def _request(self, remoto, xff=None):
+        request = RequestFactory().post('/')
+        request.META['REMOTE_ADDR'] = remoto
+        if xff is not None:
+            request.META['HTTP_X_FORWARDED_FOR'] = xff
+        return request
+
+    def test_usa_remoto_cuando_no_hay_xff(self):
+        request = self._request('1.2.3.4')
+        self.assertEqual(seguridad.obtener_ip(request), '1.2.3.4')
+
+    def test_ignora_xff_sobre_http_sin_proxy_confiable(self):
+        request = self._request('1.2.3.4', xff='6.6.6.6')
+        self.assertEqual(seguridad.obtener_ip(request), '1.2.3.4')
+
+    def test_usa_xff_desde_proxy_confiable(self):
+        with self.settings(TRUSTED_PROXIES=['5.5.5.5']):
+            request = self._request('5.5.5.5', xff='6.6.6.6')
+            self.assertEqual(seguridad.obtener_ip(request), '6.6.6.6')
+
+    def test_usa_xff_sobre_https(self):
+        request = self._request('10.0.0.1', xff='6.6.6.6')
+        request.META['wsgi.url_scheme'] = 'https'
+        self.assertEqual(seguridad.obtener_ip(request), '6.6.6.6')
