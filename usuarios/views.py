@@ -1,11 +1,15 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.views import View
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Usuario, PreferenciaUsuario
+from . import seguridad
 
 
 class RegistroView(View):
@@ -22,6 +26,14 @@ class RegistroView(View):
         password1 = request.POST.get('password1', '')
         password2 = request.POST.get('password2', '')
 
+        ip = seguridad.obtener_ip(request)
+        if seguridad.registro_bloqueado(ip):
+            return render(request, self.template_name, {
+                'errores': ['Demasiados registros desde tu conexión. Inténtalo más tarde.'],
+                'username': username,
+                'email': email,
+            }, status=429)
+
         # Validaciones
         errores = []
         if not username or len(username) < 3:
@@ -32,10 +44,19 @@ class RegistroView(View):
             errores.append('La contraseña debe tener al menos 8 caracteres.')
         if password1 != password2:
             errores.append('Las contraseñas no coinciden.')
-        if Usuario.objects.filter(username=username).exists():
-            errores.append('Ese nombre de usuario ya está en uso.')
-        if Usuario.objects.filter(email=email).exists():
-            errores.append('Ese email ya está registrado.')
+        if Usuario.objects.filter(username=username).exists() or \
+                Usuario.objects.filter(email=email).exists():
+            errores.append('Ese email o nombre de usuario ya está en uso.')
+
+        # Políticas de contraseña del proyecto (evita '12345678', 'password', ...)
+        if password1 == password2 and password1:
+            try:
+                validate_password(
+                    password1,
+                    user=Usuario(username=username, email=email),
+                )
+            except ValidationError as e:
+                errores.extend(e.messages)
 
         if errores:
             return render(request, self.template_name, {
@@ -44,6 +65,7 @@ class RegistroView(View):
                 'email': email,
             })
 
+        seguridad.registrar_registro(ip)
         usuario = Usuario.objects.create_user(
             username=username,
             email=email,
@@ -102,12 +124,28 @@ class LoginView(View):
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password', '')
 
+        ip = seguridad.obtener_ip(request)
+        if seguridad.login_bloqueado(email, ip):
+            return render(request, self.template_name, {
+                'error': 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.',
+                'email': email,
+            }, status=429)
+
         usuario = authenticate(request, username=email, password=password)
         if usuario:
             login(request, usuario)
+            seguridad.resetear_login(email, ip)
             next_url = request.GET.get('next', 'compra:lista')
+            # Evita open redirect: solo admite rutas internas del propio host
+            if not url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                next_url = 'compra:lista'
             return redirect(next_url)
 
+        seguridad.registrar_fallo_login(email, ip)
         return render(request, self.template_name, {
             'error': 'Email o contraseña incorrectos.',
             'email': email,

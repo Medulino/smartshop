@@ -10,7 +10,6 @@ from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword, Categoria,
 import json
 from .utils import normalizar as _normalizar
 from usuarios.models import FeatureFlag
-from django.core.cache import cache
 from django.conf import settings
 
 
@@ -228,16 +227,11 @@ def asignar_pasillo(request, item_id):
 def usuario_supero_limite(usuario, accion, limite=10, ventana_segundos=3600):
     """
     Comprueba si el usuario ha superado el límite de usos de una acción
-    (identificada por `accion`) en la ventana de tiempo dada.
+    (identificada por `accion`) en la ventana de tiempo dada. Respaldado
+    en base de datos para que el contador sea compartido entre workers.
     """
-    clave = f"limite_{accion}_{usuario.id}"
-    intentos = cache.get(clave, 0)
-
-    if intentos >= limite:
-        return True
-
-    cache.set(clave, intentos + 1, ventana_segundos)
-    return False
+    from usuarios.seguridad import supero_limite
+    return supero_limite(f"uso_{accion}_{usuario.id}", limite, ventana_segundos)
 
 
 def usuario_supero_limite_fotos(usuario, limite=10, ventana_segundos=3600):

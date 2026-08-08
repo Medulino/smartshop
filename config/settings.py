@@ -101,6 +101,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'usuarios.middleware.AdminLoginRateLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -186,3 +187,25 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # IA
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+
+# Seguridad de transporte (HTTPS)
+# -------------------------------------
+# Cuando la app se sirve por HTTPS (producción) se fuerzan cookies seguras,
+# redirección a HTTPS, HSTS y política de referer. En local (DEBUG=True)
+# se deja HTTP para no romper el acceso por red local/Meshnet.
+# ENABLE_HTTPS=True lo fuerza siempre; ENABLE_HTTPS=False lo desactiva.
+_https = os.getenv('ENABLE_HTTPS')
+if _https == 'True' or (_https is None and not DEBUG):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+
+# Expiración de sesión por inactividad (por defecto Django usa 2 semanas;
+# si se quiere cerrar sesión al cerrar el navegador, descomentar):
+# SESSION_EXPIRE_AT_BROWSER_CLOSE = True

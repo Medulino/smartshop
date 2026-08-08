@@ -43,6 +43,26 @@ class Usuario(AbstractUser):
         if es_nuevo:
             PreferenciaUsuario.objects.get_or_create(usuario=self)
 
+class IntentoFallo(models.Model):
+    """
+    Contador de intentos fallidos (login, registro, admin) por base única
+    (p. ej. 'login_email_ip' o 'login_ip_...'). Respaldado en BD para que
+    el límite sea compartido entre todos los workers. Se limpia con el
+    comando de gestión 'limpiar_intentos'.
+    """
+    base = models.CharField(max_length=255, unique=True)
+    intentos = models.PositiveIntegerField(default=0)
+    ultimo_intento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Intento fallido'
+        verbose_name_plural = 'Intentos fallidos'
+        ordering = ['-ultimo_intento']
+
+    def __str__(self):
+        return f"{self.base}: {self.intentos} intentos"
+
+
 class FeatureFlag(models.Model):
     """
     Controla qué funcionalidades están activas.
