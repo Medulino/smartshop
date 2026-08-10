@@ -14,6 +14,15 @@ MAX_PASILLOS_IMPORTACION = 100
 MAX_KEYWORDS_POR_PASILLO = 30
 
 
+def _cliente_ia():
+    from google import genai
+    from google.genai import types
+    return genai.Client(
+        api_key=settings.GEMINI_API_KEY,
+        http_options=types.HttpOptions(timeout=60),
+    )
+
+
 def sugerir_categorias(nombre_pasillo):
     """
     Categorías globales cuyo nombre (o alguno de sus "trozos" separados
@@ -189,8 +198,7 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     ("Nombre del pasillo: palabra1, palabra2..."), usando Gemini, para
     que el usuario no tenga que aprender ninguna sintaxis.
     """
-    import google.generativeai as genai
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+    client = _cliente_ia()
 
     modelos = [
         'gemini-3-flash-preview',
@@ -223,9 +231,8 @@ def estructurar_pasillos_con_ia(descripcion_libre):
 
     for nombre_modelo in modelos:
         try:
-            model = genai.GenerativeModel(model_name=nombre_modelo)
-            response = model.generate_content(
-                prompt, request_options={'timeout': 60}
+            response = client.models.generate_content(
+                model=nombre_modelo, contents=prompt
             )
             if response.text:
                 return response.text.strip(), None
@@ -237,12 +244,12 @@ def estructurar_pasillos_con_ia(descripcion_libre):
 
 
 def leer_lista_desde_imagen(imagen_file):
-    import google.generativeai as genai
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+    import time
+    client = _cliente_ia()
 
     modelos = [
-    'gemini-3-flash-preview',
     'gemini-2.5-flash',
+    'gemini-3-flash-preview',
     ]
 
     prompt = """
@@ -257,21 +264,27 @@ def leer_lista_desde_imagen(imagen_file):
     img = PIL.Image.open(buffer_reducido)
 
     for nombre_modelo in modelos:
-        try:
-            model = genai.GenerativeModel(model_name=nombre_modelo)
-            response = model.generate_content(
-                [prompt, img], request_options={'timeout': 60}
-            )
-            if response.text:
-                texto = response.text.replace('\n', ',').replace(';', ',')
-                productos = [
-                    p.strip().lower()
-                    for p in texto.split(',')
-                    if p.strip() and len(p.strip()) > 1
-                ][:MAX_KEYWORDS_POR_PASILLO]
-                return productos, None
-        except Exception as e:
-            logger.warning('Error de IA en leer_lista_desde_imagen (%s): %s', nombre_modelo, e)
-            continue
+        for intento in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=nombre_modelo, contents=[prompt, img]
+                )
+                if response.text:
+                    texto = response.text.replace('\n', ',').replace(';', ',')
+                    productos = [
+                        p.strip().lower()
+                        for p in texto.split(',')
+                        if p.strip() and len(p.strip()) > 1
+                    ][:MAX_KEYWORDS_POR_PASILLO]
+                    return productos, None
+            except Exception as e:
+                logger.warning(
+                    'Error de IA en leer_lista_desde_imagen (%s, intento %s): %s',
+                    nombre_modelo, intento + 1, e
+                )
+                if intento < 2:
+                    time.sleep(1 + intento)
+                    continue
+            break
 
     return [], "El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde."
