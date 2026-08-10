@@ -125,7 +125,11 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
             </option>
             {% endfor %}
         </select>
+        {% if flags_bloqueados.historial %}
+        <a href="{% url 'usuarios:premium' %}" class="btn btn-outline-warning btn-sm" title="Historial (Premium)">🔒</a>
+        {% elif flags.historial %}
         <a href="{% url 'compra:historial' %}" class="btn btn-outline-secondary btn-sm">📜</a>
+        {% endif %}
         {% if flags.supermercados_publicos %}
         <a href="{% url 'compra:explorar' %}" class="btn btn-outline-secondary btn-sm">🌍</a>
         {% endif %}
@@ -195,11 +199,15 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 <div class="acciones-scroll mb-3">
     <button class="btn btn-outline-danger btn-sm" onclick="vaciarMarcados()">🗑️Marcados</button>
     <button class="btn btn-outline-secondary btn-sm" onclick="vaciarLista()">🗑️Todo</button>
-    {% if flags.plantillas %}
+    {% if flags_bloqueados.plantillas %}
+    <a href="{% url 'usuarios:premium' %}" class="btn btn-outline-warning btn-sm">🔒Mis Listas</a>
+    {% elif flags.plantillas %}
     <button class="btn btn-outline-success btn-sm" onclick="guardarPlantilla()">⭐Mis Listas</button>
     {% endif %}
     <button class="btn btn-success btn-sm" onclick="finalizarCompra()">✅Finalizar</button>
-    {% if flags.exportar_pdf %}
+    {% if flags_bloqueados.exportar_pdf %}
+    <a href="{% url 'usuarios:premium' %}" class="btn btn-outline-warning btn-sm">🔒PDF</a>
+    {% elif flags.exportar_pdf %}
     <a href="{% url 'compra:exportar_pdf' lista.id %}" class="btn btn-outline-primary btn-sm">📄PDF</a>
     {% endif %}
 </div>

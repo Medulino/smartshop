@@ -1,0 +1,82 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium — Compra Inteligente</title>
+    {% bootstrap_css %}
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-6">
+
+            <div class="text-center mb-4">
+                <div class="fs-1">👑</div>
+                <h1 class="h3">Plan Premium</h1>
+                <p class="text-muted">
+                    {% if es_premium %}
+                        Tu plan Premium está activo hasta
+                        <strong>{{ premium_hasta|date:"d/m/Y" }}</strong>
+                        ({{ usuario.dias_premium_restantes }} días restantes).
+                    {% else %}
+                        Desbloquea todo tu potencial de compra.
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <div class="text-center border-bottom pb-4 mb-4">
+                        <span class="display-4">3€</span>
+                        <span class="text-muted">/mes</span>
+                        <p class="text-muted mb-0 mt-2">
+                            Sin permanencia. Cáncelalo cuando quieras.
+                        </p>
+                    </div>
+
+                    <h2 class="h5">Qué incluye</h2>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">🔁 <strong>Historial y repetir compra</strong> — retoma tu última compra del supermercado.</li>
+                        <li class="mb-2">📋 <strong>Plantillas</strong> — guarda listas tipo y reutilízalas en un clic.</li>
+                        <li class="mb-2">🖨️ <strong>Exportar a PDF</strong> — llévate la lista al súper en papel.</li>
+                        <li class="mb-2">💡 <strong>Sugerencias inteligentes</strong> — detecta lo que sueles olvidar.</li>
+                        <li class="mb-2">🤝 <strong>Modo colaborativo</strong> — comparte y edita la lista en familia.</li>
+                        <li class="mb-2">⭐ <strong>Productos favoritos</strong> — añádelos a la lista en un toque.</li>
+                        <li class="mb-2">📊 <strong>Estadísticas de gasto</strong> — conoce a dónde va tu dinero.</li>
+                    </ul>
+
+                    <div class="mt-4 text-center">
+                        {% if es_premium %}
+                            <a href="{% url 'compra:lista' %}" class="btn btn-success">
+                                Volver a mi lista
+                            </a>
+                        {% else %}
+                            <button type="button" class="btn btn-success w-100" disabled>
+                                🔒 Hazte Premium
+                            </button>
+                            <p class="text-muted small mt-2 mb-0">
+                                El pago seguro estará disponible muy pronto.
+                                Mientras tanto, puedes activarlo con el comando
+                                <code>conceder_premium</code> o desde el panel de administración.
+                            </p>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+
+            <p class="text-center mt-3 text-muted">
+                <a href="{% url 'compra:lista' %}">← Volver a mi lista</a>
+            </p>
+
+        </div>
+    </div>
+</div>
+
+{% bootstrap_javascript %}
+</body>
+</html>

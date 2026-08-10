@@ -16,6 +16,30 @@ from usuarios.models import FeatureFlag
 from django.conf import settings
 
 
+def _bloqueo_premium(request, ajax=True):
+    """Devuelve una respuesta de bloqueo si el usuario no es premium.
+
+    None si puede pasar. Las funciones premium se protegen siempre en el
+    servidor, no solo ocultando el botón en la interfaz: si el usuario no
+    es premium, la vista redirige (HTML) o devuelve 403 (AJAX) aunque
+    conozca la URL.
+    """
+    if request.user.es_premium:
+        return None
+
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    if ajax:
+        return JsonResponse({
+            'error': 'Esto es Premium. Hazte premium para usar esta función.',
+            'premium': True,
+        }, status=403)
+
+    messages.info(request, 'Esto es Premium: mejora tu plan para usarlo.')
+    return redirect('usuarios:premium')
+
+
 def _candidatos(supermercado):
     """Palabras de pasillos (propias + heredadas de categorías globales)
     cacheadas por supermercado, para no re-leerlas por cada producto."""
@@ -753,6 +777,9 @@ def eliminar_keyword(request, keyword_id):
 @login_required
 @require_POST
 def guardar_como_plantilla(request, lista_id):
+    resp = _bloqueo_premium(request)
+    if resp:
+        return resp
     resp = _rechazo_limite_escritura(request)
     if resp:
         return resp
@@ -785,6 +812,9 @@ def guardar_como_plantilla(request, lista_id):
 @login_required
 @require_POST
 def usar_plantilla(request, plantilla_id):
+    resp = _bloqueo_premium(request)
+    if resp:
+        return resp
     plantilla = get_object_or_404(
         Lista, id=plantilla_id, usuario=request.user, es_plantilla=True
     )
@@ -806,6 +836,9 @@ def usar_plantilla(request, plantilla_id):
 @require_POST
 def repetir_lista(request, lista_id):
     """Copia los productos de una lista anterior a la lista activa actual."""
+    resp = _bloqueo_premium(request)
+    if resp:
+        return resp
     lista_origen = get_object_or_404(Lista, id=lista_id, usuario=request.user)
     lista_activa, _ = Lista.objects.get_or_create(
         supermercado=lista_origen.supermercado,
@@ -824,6 +857,9 @@ def repetir_lista(request, lista_id):
 @login_required
 @require_POST
 def eliminar_plantilla(request, plantilla_id):
+    resp = _bloqueo_premium(request)
+    if resp:
+        return resp
     plantilla = get_object_or_404(
         Lista, id=plantilla_id, usuario=request.user, es_plantilla=True
     )
@@ -836,6 +872,9 @@ class HistorialView(View):
     template_name = 'compra/historial.html'
 
     def get(self, request):
+        resp = _bloqueo_premium(request, ajax=False)
+        if resp:
+            return resp
         listas_qs = Lista.objects.filter(
             usuario=request.user, es_plantilla=False, activa=False
         ).select_related('supermercado').annotate(
@@ -868,6 +907,10 @@ def exportar_pdf(request, lista_id):
     from django.template.loader import render_to_string
     from django.http import HttpResponse
     from weasyprint import HTML
+
+    resp = _bloqueo_premium(request, ajax=False)
+    if resp:
+        return resp
 
     if usuario_supero_limite(request.user, 'pdf_export', limite=20, ventana_segundos=3600):
         from django.contrib import messages

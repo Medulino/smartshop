@@ -1,5 +1,8 @@
 """Utilidades compartidas para los tests (factorys y helpers)."""
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from compra.models import (
     Supermercado, Pasillo, Keyword,
@@ -15,6 +18,14 @@ def crear_usuario(username='usuario', email=None, password=PASSWORD, **kwargs):
     return get_user_model().objects.create_user(
         username=username, email=email, password=password, **kwargs
     )
+
+
+def crear_premium(username='premium', email=None, password=PASSWORD, **kwargs):
+    """Usuario con plan premium activo (para probar features de pago)."""
+    usuario = crear_usuario(username=username, email=email, password=password, **kwargs)
+    usuario.premium_hasta = timezone.now() + timedelta(days=30)
+    usuario.save(update_fields=['premium_hasta'])
+    return usuario
 
 
 def crear_superusuario(username='admin', email=None, password=PASSWORD, **kwargs):

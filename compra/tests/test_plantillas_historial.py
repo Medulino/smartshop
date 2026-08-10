@@ -6,7 +6,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from compra.tests.utils import (
-    crear_usuario, crear_supermercado, crear_pasillo, crear_lista, crear_item,
+    crear_premium, crear_usuario, crear_supermercado, crear_pasillo,
+    crear_lista, crear_item,
 )
 
 
@@ -19,7 +20,7 @@ def post_json(client, url, data=None):
 class GuardarComoPlantillaTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.lista = crear_lista(self.usuario, self.supermercado, activa=True)
@@ -69,7 +70,7 @@ class GuardarComoPlantillaTests(TestCase):
 class UsarPlantillaTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.pasillo = crear_pasillo(self.supermercado, nombre='Frutas')
@@ -134,7 +135,7 @@ class UsarPlantillaTests(TestCase):
 class EliminarPlantillaTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.plantilla = crear_lista(
@@ -169,7 +170,7 @@ class EliminarPlantillaTests(TestCase):
 class RepetirListaTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.pasillo = crear_pasillo(self.supermercado, nombre='Frutas')
@@ -206,7 +207,7 @@ class RepetirListaTests(TestCase):
 class ArchivarListaTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.lista = crear_lista(self.usuario, self.supermercado, activa=True)
@@ -236,7 +237,7 @@ class ArchivarListaTests(TestCase):
 class HistorialViewTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
 
@@ -273,7 +274,7 @@ class HistorialViewTests(TestCase):
 class ExportarPdfTests(TestCase):
 
     def setUp(self):
-        self.usuario = crear_usuario(username='comprador')
+        self.usuario = crear_premium(username='comprador')
         self.otro_usuario = crear_usuario(username='vecino')
         self.supermercado = crear_supermercado(self.usuario, nombre='Mercado')
         self.lista = crear_lista(self.usuario, self.supermercado, activa=False)

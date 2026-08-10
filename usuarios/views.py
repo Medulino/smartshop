@@ -74,10 +74,24 @@ class RegistroView(View):
             password=password1,
         )
         self._copiar_supermercado_inicial(usuario)
+        self._premium_primer_mes_gratis(usuario)
 
         login(request, usuario)
-        messages.success(request, f'¡Bienvenido, {username}! Cuenta creada correctamente.')
+        messages.success(
+            request,
+            f'¡Bienvenido, {username}! Cuenta creada correctamente. '
+            f'🎁 Disfrutas de tu primer mes Premium gratis.',
+        )
         return redirect('compra:lista')
+
+    def _premium_primer_mes_gratis(self, usuario):
+        """Estrategia de captación: el primer mes de cada cuenta nueva es
+        premium gratis; al caducar vuelve automáticamente al plan básico."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        usuario.premium_hasta = timezone.now() + timedelta(days=30)
+        usuario.save(update_fields=['premium_hasta'])
     
     def _copiar_supermercado_inicial(self, usuario):
         """
@@ -168,3 +182,16 @@ def completar_onboarding(request):
     prefs.onboarding_completado = True
     prefs.save()
     return JsonResponse({'ok': True})
+
+
+@login_required
+def premium(request):
+    """Página de venta del plan Premium.
+
+    Sin pasarela de pago todavía: por ahora activamos la suscripción de
+    forma manual (comando 'conceder_premium' o desde el admin). Cuando
+    llegue el cobro automático, esta página será la que cierre la compra.
+    """
+    return render(request, 'usuarios/premium.html', {
+        'usuario': request.user,
+    })

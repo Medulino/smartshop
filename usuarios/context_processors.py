@@ -1,15 +1,14 @@
-from django.core.cache import cache
-
-from .models import FeatureFlag, PreferenciaUsuario
-
-
-_FLAGS_CACHE_KEY = 'feature_flags_v1'
-_FLAGS_CACHE_TTL = 60
+from .models import PreferenciaUsuario, _flags_cache
 
 
 def flags(request):
     if not request.user.is_authenticated:
-        return {'flags': {}, 'prefs': {}}
+        return {
+            'flags': {},
+            'flags_bloqueados': {},
+            'es_premium': False,
+            'premium_hasta': None,
+        }
 
     nombres = [
         'plantillas', 'historial', 'productos_favoritos',
@@ -18,24 +17,28 @@ def flags(request):
         'onboarding', 'configuracion_super', 'supermercados_publicos',
     ]
 
-    # Una sola consulta a la BD para todos los flags (antes era una query
-    # por flag en cada request), cacheada unos segundos porque se cambian
-    # desde el admin.
-    datos_flags = cache.get(_FLAGS_CACHE_KEY)
-    if datos_flags is None:
-        datos_flags = {
-            f.nombre: (f.activo, f.solo_superusuarios)
-            for f in FeatureFlag.objects.only('nombre', 'activo', 'solo_superusuarios')
-        }
-        cache.set(_FLAGS_CACHE_KEY, datos_flags, _FLAGS_CACHE_TTL)
+    # (activo, requiere_premium) por flag, cacheado unos segundos porque se
+    # cambian desde el admin. La parte per-usuario (plan) se calcula aquí.
+    datos_flags = _flags_cache()
 
+    es_premium = request.user.es_premium
     flags_activos = {}
+    flags_bloqueados = {}
     for nombre in nombres:
         estado = datos_flags.get(nombre)
-        if estado and estado[0] and not (estado[1] and not request.user.is_superuser):
-            flags_activos[nombre] = True
-        else:
+        if not estado:
             flags_activos[nombre] = False
+            continue
+        activo, requiere_premium = estado
+        if not activo:
+            flags_activos[nombre] = False
+        elif requiere_premium and not es_premium:
+            # Feature premium activa, pero el usuario es básico: se muestra
+            # como candado (no desaparece) para invitar a hacerse premium.
+            flags_activos[nombre] = False
+            flags_bloqueados[nombre] = True
+        else:
+            flags_activos[nombre] = True
 
     prefs, _ = PreferenciaUsuario.objects.get_or_create(
         usuario=request.user
@@ -43,6 +46,9 @@ def flags(request):
 
     return {
         'flags': flags_activos,
+        'flags_bloqueados': flags_bloqueados,
+        'es_premium': es_premium,
+        'premium_hasta': request.user.premium_hasta,
         'prefs': {
             'mostrar_estadisticas': prefs.mostrar_estadisticas,
             'mostrar_sugerencias': prefs.mostrar_sugerencias,
