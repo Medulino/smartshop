@@ -7,11 +7,40 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.db import models
+from django.core.cache import cache
+from .cache_pasillos import CANDIDATOS_TTL, clave_candidatos
 from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword, Categoria, CategoriaKeyword
 import json
 from .utils import normalizar as _normalizar
 from usuarios.models import FeatureFlag
 from django.conf import settings
+
+
+def _candidatos(supermercado):
+    """Palabras de pasillos (propias + heredadas de categorías globales)
+    cacheadas por supermercado, para no re-leerlas por cada producto."""
+    clave = clave_candidatos(supermercado)
+    candidatos = cache.get(clave)
+    if candidatos is not None:
+        return candidatos
+
+    candidatos = []
+    keywords_propias = Keyword.objects.filter(
+        pasillo__supermercado=supermercado
+    ).select_related('pasillo')
+    for kw in keywords_propias:
+        candidatos.append((_normalizar(kw.palabra), kw.pasillo_id))
+
+    pasillos = Pasillo.objects.filter(
+        supermercado=supermercado
+    ).prefetch_related('categorias__keywords')
+    for pasillo in pasillos:
+        for categoria in pasillo.categorias.all():
+            for ck in categoria.keywords.all():
+                candidatos.append((_normalizar(ck.palabra), pasillo.id))
+
+    cache.set(clave, candidatos, CANDIDATOS_TTL)
+    return candidatos
 
 
 def _json_body(request):
@@ -40,38 +69,24 @@ def inferir_pasillo(nombre_producto, supermercado):
     """
     nombre = _normalizar(nombre_producto)
 
-    candidatos = []  # (palabra_normalizada, pasillo)
-
-    keywords_propias = Keyword.objects.filter(
-        pasillo__supermercado=supermercado
-    ).select_related('pasillo')
-    for kw in keywords_propias:
-        candidatos.append((_normalizar(kw.palabra), kw.pasillo))
-
-    pasillos = Pasillo.objects.filter(
-        supermercado=supermercado
-    ).prefetch_related('categorias__keywords')
-    for pasillo in pasillos:
-        for categoria in pasillo.categorias.all():
-            for ck in categoria.keywords.all():
-                candidatos.append((_normalizar(ck.palabra), pasillo))
+    candidatos = _candidatos(supermercado)  # (palabra_normalizada, pasillo_id)
 
     contenidas = []
     contenedoras = []
-    for palabra, pasillo in candidatos:
+    for palabra, pasillo_id in candidatos:
         if not palabra:
             continue
         if palabra == nombre:
-            return pasillo
+            return Pasillo.objects.filter(pk=pasillo_id).first()
         if palabra in nombre:
-            contenidas.append((len(palabra), pasillo))
+            contenidas.append((len(palabra), pasillo_id))
         elif nombre in palabra:
-            contenedoras.append((len(palabra), pasillo))
+            contenedoras.append((len(palabra), pasillo_id))
 
     if contenidas:
-        return max(contenidas, key=lambda x: x[0])[1]
+        return Pasillo.objects.filter(pk=max(contenidas, key=lambda x: x[0])[1]).first()
     if contenedoras:
-        return min(contenedoras, key=lambda x: x[0])[1]
+        return Pasillo.objects.filter(pk=min(contenedoras, key=lambda x: x[0])[1]).first()
     return None
 
 
@@ -80,20 +95,22 @@ class ListaCompraView(View):
     template_name = 'compra/lista.html'
 
     def get(self, request):
-        supermercados = Supermercado.objects.filter(
-            usuario=request.user,
-            activo=True
+        supermercados = list(
+            Supermercado.objects.filter(
+                usuario=request.user,
+                activo=True
+            ).prefetch_related('pasillos')
         )
 
         super_id = request.GET.get('supermercado')
         if super_id:
             supermercado = get_object_or_404(
-                Supermercado,
+                Supermercado.objects.prefetch_related('pasillos'),
                 id=super_id,
                 usuario=request.user
             )
-        elif supermercados.exists():
-            supermercado = supermercados.first()
+        elif supermercados:
+            supermercado = supermercados[0]
         else:
             supermercado = None
 
@@ -106,6 +123,12 @@ class ListaCompraView(View):
                 activa=True,
                 defaults={}
             )
+            lista = Lista.objects.annotate(
+                num_productos=models.Count('items'),
+                num_carro=models.Count('items', filter=models.Q(items__en_carro=True)),
+                num_pendientes=models.Count('items', filter=models.Q(items__en_carro=False)),
+            ).get(pk=lista.pk)
+            lista.supermercado = supermercado
             items = lista.items.select_related('pasillo').all()
 
         return render(request, self.template_name, {
@@ -330,7 +353,10 @@ class ConfiguracionView(View):
     template_name = 'compra/configuracion.html'
 
     def get(self, request):
-        supermercados = Supermercado.objects.filter(usuario=request.user)
+        supermercados = Supermercado.objects.filter(usuario=request.user).annotate(
+            num_pasillos=models.Count('pasillos', distinct=True),
+            num_likes=models.Count('likes', distinct=True),
+        )
         return render(request, self.template_name, {
             'supermercados': supermercados,
         })
@@ -343,7 +369,10 @@ class SupermercadoDetalleView(View):
 
     def get(self, request, supermercado_id):
         supermercado = get_object_or_404(
-            Supermercado, id=supermercado_id, usuario=request.user
+            Supermercado.objects.prefetch_related(
+                'pasillos__keywords', 'pasillos__categorias'
+            ).annotate(num_likes=models.Count('likes', distinct=True)),
+            id=supermercado_id, usuario=request.user
         )
         return render(request, self.template_name, {
             'super': supermercado,
@@ -473,11 +502,18 @@ class ExplorarSupermercadosView(View):
     template_name = 'compra/explorar.html'
 
     def get(self, request):
+        me_gusta = models.Exists(
+            Supermercado.likes.through.objects.filter(
+                supermercado=models.OuterRef('pk'),
+                usuario=request.user,
+            )
+        )
         supermercados = Supermercado.objects.filter(
             publico=True
         ).select_related('usuario').annotate(
-            num_likes=models.Count('likes'),
+            num_likes=models.Count('likes', distinct=True),
             num_pasillos=models.Count('pasillos', distinct=True),
+            likes_me=me_gusta,
         ).order_by('-num_likes', '-fecha_publicacion')
 
         ya_tengo = set(
@@ -783,9 +819,13 @@ class HistorialView(View):
     def get(self, request):
         listas = Lista.objects.filter(
             usuario=request.user, es_plantilla=False, activa=False
+        ).select_related('supermercado').annotate(
+            num_productos=models.Count('items')
         ).order_by('-fecha')
         plantillas = Lista.objects.filter(
             usuario=request.user, es_plantilla=True
+        ).select_related('supermercado').annotate(
+            num_productos=models.Count('items')
         ).order_by('-fecha')
         return render(request, self.template_name, {
             'listas': listas,

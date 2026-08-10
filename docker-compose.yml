@@ -54,6 +54,7 @@ services:
         pg_dump -h db -U ${DB_USER} ${DB_NAME} > \"$$f\" && test -s \"$$f\" && echo \"Backup OK: $$f\" || { echo \"Backup FALLIDO: $$f\"; rm -f \"$$f\"; };
         find /backups -name 'backup_*.sql' -mtime +30 -delete;
         docker exec compra_web python manage.py limpiar_intentos || echo 'limpiar_intentos fallido';
+        docker exec compra_web python manage.py clearsessions || echo 'clearsessions fallido';
         sleep 86400;
       done"
 

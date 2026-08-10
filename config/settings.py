@@ -137,6 +137,9 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
+        # Reutilizar la conexión entre peticiones en vez de abrir/cerrar
+        # una por request (gran ahorro de handshake TCP+auth).
+        'CONN_MAX_AGE': 300,
     }
 }
 

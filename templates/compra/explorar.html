@@ -36,9 +36,9 @@ body { background-color: #f8f9fa; }
             </div>
         </div>
         <div class="d-flex justify-content-between align-items-center mt-2">
-            <button class="btn btn-sm btn-outline-danger like-btn {% if request.user in super.likes.all %}activo{% endif %}"
+            <button class="btn btn-sm btn-outline-danger like-btn {% if super.likes_me %}activo{% endif %}"
                     onclick="alternarLike({{ super.id }}, this)">
-                {% if request.user in super.likes.all %}❤️{% else %}🤍{% endif %}
+                {% if super.likes_me %}❤️{% else %}🤍{% endif %}
                 <span class="contador">{{ super.num_likes }}</span>
             </button>
             <button class="btn btn-sm btn-success" onclick="usarPlantilla({{ super.id }}, this)">

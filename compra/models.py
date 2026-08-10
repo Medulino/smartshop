@@ -1,5 +1,9 @@
 from django.db import models
 from django.conf import settings
+from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.dispatch import receiver
+
+from .cache_pasillos import invalidar_candidatos, invalidar_candidatos_global
 
 
 class Supermercado(models.Model):
@@ -139,6 +143,9 @@ class Lista(models.Model):
         ordering = ['-fecha']
         verbose_name = 'Lista'
         verbose_name_plural = 'Listas'
+        indexes = [
+            models.Index(fields=['usuario', '-fecha'], name='lista_usuario_fecha_idx'),
+        ]
 
     def __str__(self):
         return f"{self.usuario.username} - {self.supermercado.nombre} - {self.fecha}"
@@ -181,3 +188,28 @@ class ListaItem(models.Model):
     def __str__(self):
         pasillo_nombre = self.pasillo.nombre if self.pasillo else 'Sin asignar'
         return f"{self.nombre} ({pasillo_nombre})"
+
+
+# Invalidación de la caché de candidatos de pasillos cuando cambia el
+# corpus de palabras (keywords propias, categorías heredadas o pasillos).
+
+
+@receiver([post_save, post_delete], sender=Keyword)
+def _keyword_cambiado(sender, instance, **kwargs):
+    invalidar_candidatos(instance.pasillo.supermercado)
+
+
+@receiver([post_save, post_delete], sender=Pasillo)
+def _pasillo_cambiado(sender, instance, **kwargs):
+    invalidar_candidatos(instance.supermercado)
+
+
+@receiver(m2m_changed, sender=Pasillo.categorias.through)
+def _categorias_pasillo_cambiadas(sender, instance, **kwargs):
+    if kwargs.get('action') in ('post_add', 'post_remove', 'post_clear'):
+        invalidar_candidatos(instance.supermercado)
+
+
+@receiver([post_save, post_delete], sender=CategoriaKeyword)
+def _categoria_keyword_cambiada(sender, instance, **kwargs):
+    invalidar_candidatos_global()

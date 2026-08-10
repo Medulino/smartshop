@@ -145,19 +145,19 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 <div class="row g-2 mb-3">
     <div class="col-4">
         <div class="card stat-card text-center py-2">
-            <div class="fs-3 fw-bold">{{ lista.total_productos }}</div>
+            <div class="fs-3 fw-bold">{{ lista.num_productos }}</div>
             <div class="text-muted" style="font-size:11px">total</div>
         </div>
     </div>
     <div class="col-4">
         <div class="card stat-card text-center py-2">
-            <div class="fs-3 fw-bold text-success">{{ lista.productos_en_carro }}</div>
+            <div class="fs-3 fw-bold text-success">{{ lista.num_carro }}</div>
             <div class="text-muted" style="font-size:11px">en el carro</div>
         </div>
     </div>
     <div class="col-4">
         <div class="card stat-card text-center py-2">
-            <div class="fs-3 fw-bold text-primary">{{ lista.productos_pendientes }}</div>
+            <div class="fs-3 fw-bold text-primary">{{ lista.num_pendientes }}</div>
             <div class="text-muted" style="font-size:11px">pendientes</div>
         </div>
     </div>
@@ -477,7 +477,7 @@ async function guardarPlantilla() {
 }
 
 async function finalizarCompra() {
-    const pendientes = {{ lista.productos_pendientes|default:0 }};
+    const pendientes = {{ lista.num_pendientes|default:0 }};
     if (pendientes > 0) {
         if (!confirm(`Tienes ${pendientes} productos pendientes. ¿Finalizar igualmente?`)) return;
     }
