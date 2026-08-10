@@ -134,6 +134,7 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
         <a href="{% url 'compra:explorar' %}" class="btn btn-outline-secondary btn-sm">🌍</a>
         {% endif %}
         <a href="{% url 'compra:configuracion' %}" class="btn btn-outline-secondary btn-sm">⚙️</a>
+        <a href="{% url 'usuarios:cambiar_password' %}" class="btn btn-outline-secondary btn-sm" title="Cambiar contraseña">🔑</a>
         <form method="post" action="{% url 'usuarios:logout' %}" class="d-inline m-0">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-danger btn-sm">🚪 Salir</button>

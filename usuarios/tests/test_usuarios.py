@@ -213,3 +213,55 @@ class ListaCompraProtegidaTests(TestCase):
         respuesta = self.client.get(reverse('compra:lista'))
         self.assertEqual(respuesta.status_code, 302)
         self.assertIn(reverse('usuarios:login'), respuesta.url)
+
+
+class CambiarPasswordTests(TestCase):
+    def test_get_sin_login_redirige_a_login(self):
+        respuesta = self.client.get(reverse('usuarios:cambiar_password'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('usuarios:login'), respuesta.url)
+
+    def test_get_con_login_renderiza_formulario(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.get(reverse('usuarios:cambiar_password'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Contraseña actual')
+
+    def test_post_valido_cambia_la_contrasena_y_redirige(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.post(reverse('usuarios:cambiar_password'), {
+            'old_password': 'clave12345',
+            'new_password1': 'NuevaClave2026!',
+            'new_password2': 'NuevaClave2026!',
+        })
+        self.assertRedirects(respuesta, reverse('usuarios:cambiar_password_hecho'))
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password('NuevaClave2026!'))
+
+    def test_post_con_password_actual_incorrecta_muestra_error(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.post(reverse('usuarios:cambiar_password'), {
+            'old_password': 'clave-mala',
+            'new_password1': 'NuevaClave2026!',
+            'new_password2': 'NuevaClave2026!',
+        })
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Su contraseña antigua es incorrecta')
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password('clave12345'))
+
+    def test_post_passwords_que_no_coinciden_muestra_error(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.post(reverse('usuarios:cambiar_password'), {
+            'old_password': 'clave12345',
+            'new_password1': 'NuevaClave2026!',
+            'new_password2': 'OtraClave2026!',
+        })
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Los dos campos de contraseña no coinciden.')
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password('clave12345'))
