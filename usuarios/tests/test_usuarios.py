@@ -1,5 +1,13 @@
+from datetime import timedelta
+
+from django.core import mail
+from django.core.management import call_command
+from django.contrib.auth.tokens import default_token_generator
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from compra.models import Supermercado, Pasillo, Keyword
 from compra.tests.utils import (
@@ -23,18 +31,23 @@ class RegistroViewTests(TestCase):
         respuesta = self.client.get(reverse('usuarios:registro'))
         self.assertEqual(respuesta.status_code, 200)
 
-    def test_post_valido_crea_usuario_preferencias_loguea_y_redirige(self):
+    def test_post_valido_crea_usuario_inactivo_envia_email_y_no_loguea(self):
         respuesta = self.client.post(reverse('usuarios:registro'), {
             'username': 'nuevo',
             'email': 'nuevo@test.com',
             'password1': 'clave12345',
             'password2': 'clave12345',
         })
-        self.assertRedirects(respuesta, reverse('compra:lista'))
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
         usuario = Usuario.objects.get(username='nuevo')
         self.assertTrue(PreferenciaUsuario.objects.filter(usuario=usuario).exists())
-        autenticado = self.client.get(reverse('compra:lista'))
-        self.assertEqual(autenticado.wsgi_request.user, usuario)
+        self.assertFalse(usuario.is_active)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Activa tu cuenta', mail.outbox[0].subject)
+        self.assertIn('activar', mail.outbox[0].body)
+        # No queda autenticado tras registrarse
+        protegida = self.client.get(reverse('compra:lista'))
+        self.assertEqual(protegida.status_code, 302)
 
     def test_post_valido_copia_supermercado_con_pasillos_y_keywords(self):
         admin = crear_superusuario()
@@ -49,7 +62,7 @@ class RegistroViewTests(TestCase):
             'password1': 'clave12345',
             'password2': 'clave12345',
         })
-        self.assertRedirects(respuesta, reverse('compra:lista'))
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
         usuario = Usuario.objects.get(username='nuevo')
         copia = usuario.supermercados.get(nombre='Mi Super del Barrio')
         pasillos_copia = list(copia.pasillos.values_list('nombre', flat=True))
@@ -66,9 +79,21 @@ class RegistroViewTests(TestCase):
             'password1': 'clave12345',
             'password2': 'clave12345',
         })
-        self.assertRedirects(respuesta, reverse('compra:lista'))
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
         usuario = Usuario.objects.get(username='nuevo')
         self.assertEqual(usuario.supermercados.count(), 0)
+
+    def test_post_rechaza_dominio_temporal(self):
+        respuesta = self.client.post(reverse('usuarios:registro'), {
+            'username': 'nuevo',
+            'email': 'nuevo@dnsink.com',
+            'password1': 'clave12345',
+            'password2': 'clave12345',
+        })
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Correo no permitido, usa otro.')
+        self.assertFalse(Usuario.objects.filter(email='nuevo@dnsink.com').exists())
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_username_demasiado_corto_error(self):
         respuesta = self.client.post(reverse('usuarios:registro'), {
@@ -180,6 +205,117 @@ class LoginViewTests(TestCase):
         })
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'Email o contraseña incorrectos.')
+
+    def test_post_cuenta_sin_activar_mensaje_especifico(self):
+        usuario = crear_usuario(email='sinactivar@test.com')
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        respuesta = self.client.post(reverse('usuarios:login'), {
+            'email': usuario.email,
+            'password': 'clave12345',
+        })
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Tu cuenta aún no está activada')
+
+
+class ActivacionCuentaTests(TestCase):
+    def _enlace(self, usuario):
+        uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
+        token = default_token_generator.make_token(usuario)
+        return reverse('usuarios:activar_cuenta', args=[uidb64, token])
+
+    def _usuario_inactivo(self, email='activa@test.com'):
+        usuario = crear_usuario(email=email)
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        return usuario
+
+    def test_activar_cuenta_valida_activa_loguea_y_concede_premium(self):
+        usuario = self._usuario_inactivo()
+        respuesta = self.client.get(self._enlace(usuario))
+        self.assertRedirects(respuesta, reverse('compra:lista'))
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.is_active)
+        self.assertTrue(usuario.es_premium)
+        lista = self.client.get(reverse('compra:lista'))
+        self.assertEqual(lista.wsgi_request.user, usuario)
+
+    def test_activar_cuenta_token_invalido_muestra_error(self):
+        usuario = self._usuario_inactivo()
+        uidb64 = urlsafe_base64_encode(force_bytes(usuario.pk))
+        respuesta = self.client.get(
+            reverse('usuarios:activar_cuenta', args=[uidb64, 'token-malo'])
+        )
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertContains(respuesta, 'Enlace no válido o caducado', status_code=400)
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.is_active)
+
+    def test_activar_cuenta_token_reutilizado_no_vuelve_a_activar(self):
+        usuario = self._usuario_inactivo()
+        enlace = self._enlace(usuario)
+        self.client.get(enlace)
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.is_active)
+        respuesta = self.client.get(enlace)
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertContains(respuesta, 'Enlace no válido o caducado', status_code=400)
+
+
+class ReenviarActivacionTests(TestCase):
+    def test_reenviar_activacion_envia_email(self):
+        usuario = crear_usuario(email='reenvio@test.com')
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        respuesta = self.client.post(
+            reverse('usuarios:reenviar_activacion'),
+            {'email': usuario.email},
+        )
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Activa tu cuenta', mail.outbox[0].subject)
+
+    def test_reenviar_activacion_sin_cuenta_no_envia(self):
+        respuesta = self.client.post(
+            reverse('usuarios:reenviar_activacion'),
+            {'email': 'noexiste@test.com'},
+        )
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_reenviar_activacion_rate_limit(self):
+        usuario = crear_usuario(email='reenvio@test.com')
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        for _ in range(3):
+            self.client.post(reverse('usuarios:reenviar_activacion'), {'email': usuario.email})
+        respuesta = self.client.post(
+            reverse('usuarios:reenviar_activacion'),
+            {'email': usuario.email},
+        )
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
+        self.assertEqual(len(mail.outbox), 3)
+
+
+class PurgarInactivosTests(TestCase):
+    def test_purga_borra_solo_inactivas_antiguas(self):
+        vieja = crear_usuario(username='vieja', email='vieja@test.com')
+        vieja.is_active = False
+        vieja.save(update_fields=['is_active'])
+        Usuario.objects.filter(pk=vieja.pk).update(
+            date_joined=timezone.now() - timedelta(days=10)
+        )
+        reciente = crear_usuario(username='reciente', email='reciente@test.com')
+        reciente.is_active = False
+        reciente.save(update_fields=['is_active'])
+        activa = crear_usuario(username='activa', email='activa@test.com')
+
+        call_command('purgar_inactivos', dias=7)
+
+        self.assertFalse(Usuario.objects.filter(email='vieja@test.com').exists())
+        self.assertTrue(Usuario.objects.filter(email='reciente@test.com').exists())
+        self.assertTrue(Usuario.objects.filter(email='activa@test.com').exists())
+
 
 
 class LogoutViewTests(TestCase):

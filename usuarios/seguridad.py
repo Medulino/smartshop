@@ -20,6 +20,7 @@ LIMITE_LOGIN_EMAIL_IP = 5
 LIMITE_LOGIN_IP = 20
 LIMITE_ADMIN_LOGIN_IP = 10
 LIMITE_REGISTRO_IP = 5
+LIMITE_REENVIO_ACTIVACION_IP = 3
 
 INTENTOS_POR_MES = 1_000_000
 
@@ -120,3 +121,13 @@ def registro_bloqueado(ip):
 
 def registrar_registro(ip):
     _registrar(f"registro_ip_{ip}", VENTANA_REGISTRO_SEGUNDOS)
+
+
+# --- Reenvío del email de activación ---
+
+def reenvio_activacion_bloqueado(ip):
+    return _intentos(f"reenvio_activacion_ip_{ip}") >= LIMITE_REENVIO_ACTIVACION_IP
+
+
+def registrar_reenvio_activacion(ip):
+    _registrar(f"reenvio_activacion_ip_{ip}", VENTANA_REGISTRO_SEGUNDOS)

@@ -119,7 +119,7 @@ class PasswordValidatorsTests(TestCase):
             reverse('usuarios:registro'),
             _datos_registro(password='clave-muy-segura-2026'),
         )
-        self.assertRedirects(respuesta, reverse('compra:lista'))
+        self.assertRedirects(respuesta, reverse('usuarios:activacion_pendiente'))
         self.assertTrue(Usuario.objects.filter(username='nuevo').exists())
 
 

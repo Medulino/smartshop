@@ -251,6 +251,37 @@ if EMAIL_HOST_USER:
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# Caducidad del enlace de activación de cuenta: 24 horas.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
+
+# Dominios de correo temporal/descartable rechazados en el registro.
+# La verificación por email es la capa real de seguridad; esta lista es solo
+# un primer filtro (se amplía a mano cuando aparezcan dominios nuevos).
+DOMINIOS_TEMPORALES = {
+    'dnsink.com',
+    'mailinator.com',
+    'mailinator.net',
+    '10minutemail.com',
+    '10minutemail.net',
+    'guerrillamail.com',
+    'guerrillamail.net',
+    'grr.la',
+    'tempmail.com',
+    'tempmail.net',
+    'temp-mail.org',
+    'yopmail.com',
+    'yopmail.net',
+    'trashmail.com',
+    'trashmail.net',
+    'mailnator.com',
+    'dispostable.com',
+    'throwawaymail.com',
+    'maildrop.cc',
+    'getnada.com',
+    'inboxkitten.com',
+    'sharklasers.com',
+}
+
 # Logging: consola (docker logs) + archivo rotatorio (./logs/django.log).
 # Si hay SMTP configurado, los errores 500 se avisan por email a ADMINS.
 LOG_DIR = BASE_DIR / 'logs'

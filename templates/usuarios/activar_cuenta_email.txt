@@ -1,0 +1,10 @@
+Hola {{ usuario.username }},
+
+Ya solo te queda un paso para empezar a usar Compra Inteligente: activar tu cuenta.
+
+{{ enlace }}
+
+El enlace caduca en 24 horas. Si no lo usaste tú, puedes ignorar este correo.
+
+Gracias,
+El equipo de Compra Inteligente

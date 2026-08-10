@@ -17,4 +17,7 @@ urlpatterns = [
     path('cambiar-password/hecho/', auth_views.PasswordChangeDoneView.as_view(
         template_name='usuarios/cambiar_password_hecho.html',
     ), name='cambiar_password_hecho'),
+    path('activacion-pendiente/', views.activacion_pendiente, name='activacion_pendiente'),
+    path('reenviar-activacion/', views.reenviar_activacion, name='reenviar_activacion'),
+    path('activar/<uidb64>/<token>/', views.activar_cuenta, name='activar_cuenta'),
 ]

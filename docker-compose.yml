@@ -44,6 +44,7 @@ services:
         find /backups -name 'backup_*.sql' -mtime +30 -delete;
         docker exec compra_web python manage.py limpiar_intentos || echo 'limpiar_intentos fallido';
         docker exec compra_web python manage.py clearsessions || echo 'clearsessions fallido';
+        docker exec compra_web python manage.py purgar_inactivos --dias 7 || echo 'purgar_inactivos fallido';
         sleep 86400;
       done"
 

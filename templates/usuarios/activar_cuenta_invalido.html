@@ -1,0 +1,48 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enlace no válido — Compra Inteligente</title>
+    {% bootstrap_css %}
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-8 col-md-5">
+
+            <div class="text-center mb-4">
+                <div class="fs-1">⏰</div>
+                <h1 class="h3">Enlace no válido o caducado</h1>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4 text-center">
+                    <p class="mb-1">
+                        Este enlace de activación no es válido o ha caducado
+                        (dura 24 horas).
+                    </p>
+                    <p class="mb-4">
+                        Si tu cuenta sigue sin activarse, entra en la página de
+                        "revisa tu correo" y pulsa en <strong>Reenviar enlace</strong>,
+                        o pídelo de nuevo desde el formulario de inicio de sesión.
+                    </p>
+                    <a href="{% url 'usuarios:activacion_pendiente' %}"
+                       class="btn btn-outline-success">
+                        Reenviar enlace de activación
+                    </a>
+                    <a href="{% url 'usuarios:login' %}" class="btn btn-success">
+                        Ir a iniciar sesión
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% bootstrap_javascript %}
+</body>
+</html>
