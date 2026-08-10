@@ -12,6 +12,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+logs/
 
 # Artefactos de build/estáticos
 staticfiles/

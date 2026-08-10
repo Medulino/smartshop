@@ -5,6 +5,7 @@ app_name = 'compra'
 
 urlpatterns = [
     path('', views.ListaCompraView.as_view(), name='lista'),
+    path('salud/', views.salud, name='salud'),
     path('añadir/', views.añadir_producto, name='añadir_producto'),
     path('toggle/<int:item_id>/', views.toggle_en_carro, name='toggle_en_carro'),
     path('eliminar/<int:item_id>/', views.eliminar_producto, name='eliminar_producto'),

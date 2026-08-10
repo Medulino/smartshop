@@ -39,7 +39,7 @@
 <h5 class="mb-3">🗓️ Últimas compras</h5>
 {% if listas %}
 <div class="list-group">
-    {% for l in listas|slice:":5" %}
+    {% for l in listas %}
     <div class="list-group-item d-flex justify-content-between align-items-center">
         <div>
             <strong>{{ l.fecha }}</strong>
@@ -49,6 +49,19 @@
     </div>
     {% endfor %}
 </div>
+{% if listas.paginator.num_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if listas.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ listas.previous_page_number }}">← Anterior</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Página {{ listas.number }} de {{ listas.paginator.num_pages }}</span></li>
+        {% if listas.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ listas.next_page_number }}">Siguiente →</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 {% else %}
 <p class="text-muted">Aún no tienes listas en el historial.</p>
 {% endif %}

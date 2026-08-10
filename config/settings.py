@@ -229,3 +229,93 @@ if _https == 'True' or (_https is None and not DEBUG):
 # Expiración de sesión por inactividad (por defecto Django usa 2 semanas;
 # si se quiere cerrar sesión al cerrar el navegador, descomentar):
 # SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+
+# Alertas de errores por email (ADMINS) ante 500 en producción.
+# Formato de ADMINS: "Nombre:correo@dominio,Nombre2:correo2@dominio"
+# Sin credenciales SMTP configuradas, el backend cae al de consola y no se
+# envía nada (todo degrada sin romper).
+ADMINS = [
+    tuple(a.split(':', 1)) for a in os.getenv('ADMINS', '').split(',')
+    if ':' in a and a.strip()
+]
+SERVER_EMAIL = os.getenv('SERVER_EMAIL', 'errores@comprainteligente.local')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', SERVER_EMAIL)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+if EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Logging: consola (docker logs) + archivo rotatorio (./logs/django.log).
+# Si hay SMTP configurado, los errores 500 se avisan por email a ADMINS.
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'archivo': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'django.log',
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'mail_admins': {
+            'class': 'django.utils.log.AdminEmailHandler',
+            'level': 'ERROR',
+            'filters': ['require_debug_false'],
+            'include_html': False,
+        },
+    },
+    'root': {
+        'handlers': ['console', 'archivo'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'archivo'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': (
+                ['console', 'archivo', 'mail_admins']
+                if EMAIL_HOST_USER else ['console', 'archivo']
+            ),
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'compra': {
+            'handlers': ['console', 'archivo'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'usuarios': {
+            'handlers': ['console', 'archivo'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

@@ -1,7 +1,7 @@
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from django.views import View
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -50,6 +50,20 @@ def _json_body(request):
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
         return None
     return data if isinstance(data, dict) else None
+
+
+@require_GET
+def salud(request):
+    """Healthcheck: devuelve 200 solo si la BD responde. Sin datos sensibles."""
+    from django.db import connection
+    from django.http import JsonResponse
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        return JsonResponse({'estado': 'ok'})
+    except Exception:
+        return JsonResponse({'estado': 'error'}, status=503)
 
 
 def inferir_pasillo(nombre_producto, supermercado):
@@ -353,9 +367,14 @@ class ConfiguracionView(View):
     template_name = 'compra/configuracion.html'
 
     def get(self, request):
-        supermercados = Supermercado.objects.filter(usuario=request.user).annotate(
+        supermercados_qs = Supermercado.objects.filter(
+            usuario=request.user
+        ).annotate(
             num_pasillos=models.Count('pasillos', distinct=True),
             num_likes=models.Count('likes', distinct=True),
+        ).order_by('nombre')
+        supermercados = Paginator(supermercados_qs, 20).get_page(
+            request.GET.get('page')
         )
         return render(request, self.template_name, {
             'supermercados': supermercados,
@@ -817,7 +836,7 @@ class HistorialView(View):
     template_name = 'compra/historial.html'
 
     def get(self, request):
-        listas = Lista.objects.filter(
+        listas_qs = Lista.objects.filter(
             usuario=request.user, es_plantilla=False, activa=False
         ).select_related('supermercado').annotate(
             num_productos=models.Count('items')
@@ -827,6 +846,7 @@ class HistorialView(View):
         ).select_related('supermercado').annotate(
             num_productos=models.Count('items')
         ).order_by('-fecha')
+        listas = Paginator(listas_qs, 10).get_page(request.GET.get('page'))
         return render(request, self.template_name, {
             'listas': listas,
             'plantillas': plantillas,

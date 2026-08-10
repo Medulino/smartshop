@@ -66,6 +66,20 @@ body { background-color: #f8f9fa; }
     {% endfor %}
 </ul>
 
+{% if supermercados.paginator.num_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if supermercados.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ supermercados.previous_page_number }}">← Anterior</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Página {{ supermercados.number }} de {{ supermercados.paginator.num_pages }}</span></li>
+        {% if supermercados.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ supermercados.next_page_number }}">Siguiente →</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 </div>
 
 {% bootstrap_javascript %}
