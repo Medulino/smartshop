@@ -17,9 +17,10 @@ MAX_KEYWORDS_POR_PASILLO = 30
 def _cliente_ia():
     from google import genai
     from google.genai import types
+    # Ojo: HttpOptions.timeout va en MILISEGUNDOS (60 s = 60_000).
     return genai.Client(
         api_key=settings.GEMINI_API_KEY,
-        http_options=types.HttpOptions(timeout=60),
+        http_options=types.HttpOptions(timeout=60_000),
     )
 
 
@@ -201,8 +202,8 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     client = _cliente_ia()
 
     modelos = [
-        'gemini-3-flash-preview',
-        'gemini-2.5-flash',
+        'gemini-3.5-flash',
+        'gemini-flash-latest',
     ]
 
     prompt = """
@@ -248,8 +249,8 @@ def leer_lista_desde_imagen(imagen_file):
     client = _cliente_ia()
 
     modelos = [
-    'gemini-2.5-flash',
-    'gemini-3-flash-preview',
+        'gemini-3.5-flash',
+        'gemini-flash-latest',
     ]
 
     prompt = """
