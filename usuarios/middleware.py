@@ -1,7 +1,26 @@
+from django.conf import settings
 from django.http import HttpResponse
 from django.urls import Resolver404, resolve
 
 from . import seguridad
+
+
+class ContentSecurityPolicyMiddleware:
+    """Añade la cabecera Content-Security-Policy a todas las respuestas.
+
+    La política está en settings.CSP_HEADER. Se bloquean orígenes externos
+    (salvo el CDN de Bootstrap), iframes, objetos/plugins y navegación ajena;
+    se permiten scripts/estilos inline porque las plantillas los usan a
+    propósito (para endurecer más habría que externalizarlos a ficheros).
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['Content-Security-Policy'] = settings.CSP_HEADER
+        return response
 
 
 class AdminLoginRateLimitMiddleware:

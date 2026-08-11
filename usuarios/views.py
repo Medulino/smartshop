@@ -245,6 +245,16 @@ def premium(request):
     })
 
 
+@login_required
+def plan(request):
+    """Comparativa Básico vs Premium (sustituye a la antigua guía de
+    bienvenida). Se muestra automáticamente la primera vez hasta que el
+    usuario la cierra (marca el onboarding como completado)."""
+    return render(request, 'usuarios/plan.html', {
+        'usuario': request.user,
+    })
+
+
 def activacion_pendiente(request):
     """Página que se muestra justo tras registrarse: la cuenta está inactiva
     hasta que se confirme el email. Si no hay SMTP configurado (backend de

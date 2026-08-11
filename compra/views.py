@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.views import View
@@ -12,7 +12,7 @@ from .cache_pasillos import CANDIDATOS_TTL, clave_candidatos
 from .models import Supermercado, Lista, ListaItem, Pasillo, Keyword, Categoria, CategoriaKeyword
 import json
 from .utils import normalizar as _normalizar
-from usuarios.models import FeatureFlag
+from usuarios.models import FeatureFlag, PreferenciaUsuario
 from django.conf import settings
 
 
@@ -133,6 +133,13 @@ class ListaCompraView(View):
     template_name = 'compra/lista.html'
 
     def get(self, request):
+        # Primera visita: en vez de la antigua guía modal, se muestra la
+        # comparativa Básico vs Premium hasta que el usuario la cierre.
+        prefs, _ = PreferenciaUsuario.objects.get_or_create(usuario=request.user)
+        if (FeatureFlag.esta_activo('onboarding', request.user)
+                and not prefs.onboarding_completado):
+            return redirect('usuarios:plan')
+
         supermercados = list(
             Supermercado.objects.filter(
                 usuario=request.user,

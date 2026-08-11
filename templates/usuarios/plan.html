@@ -1,0 +1,139 @@
+{% load django_bootstrap5 %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planes — Compra Inteligente</title>
+    {% bootstrap_css %}
+    <style>
+        .premium-col { background-color: #fff8e1; }
+        .chk { font-weight: bold; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-9">
+
+            <div class="text-center mb-4">
+                <div class="fs-1">⚖️</div>
+                <h1 class="h3">Elige tu plan</h1>
+                <p class="text-muted">Todo lo necesario para una compra inteligente.</p>
+                {% if es_premium %}
+                    <span class="badge bg-warning text-dark">👑 Tu plan: Premium hasta {{ premium_hasta|date:"d/m/Y" }}</span>
+                {% else %}
+                    <span class="badge bg-secondary">Tu plan: Básico (gratis)</span>
+                {% endif %}
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Funciones</th>
+                                    <th class="text-center" style="width:16%">Básico</th>
+                                    <th class="text-center premium-col" style="width:18%">👑 Premium</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="ps-4">📝 Lista de la compra ilimitada</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">📍 Productos ordenados por pasillos de tu supermercado</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">📷 Leer tu lista de la compra desde una foto (IA)</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">🛒 Crear y configurar tus propios supermercados</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">🌍 Explorar supermercados públicos y copiarlos</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">🔐 Cuenta segura con verificación por email</td>
+                                    <td class="text-center chk text-success">✓</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">📜 Historial y repetir una compra</td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">⭐ Guardar y usar plantillas de lista</td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">🖨️ Exportar la lista a PDF</td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">💡 Sugerencias inteligentes <small class="text-muted">(pronto)</small></td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">🤝 Compartir la lista en familia <small class="text-muted">(pronto)</small></td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">📊 Estadísticas de gasto <small class="text-muted">(pronto)</small></td>
+                                    <td class="text-center text-muted">—</td>
+                                    <td class="text-center chk text-success premium-col">✓</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
+                <button type="button" class="btn btn-success btn-lg" onclick="empezar()">
+                    Comenzar a usar la app →
+                </button>
+                {% if not es_premium %}
+                <a href="{% url 'usuarios:premium' %}" class="btn btn-outline-warning btn-lg">
+                    👑 Hazte Premium · 3€/mes
+                </a>
+                {% endif %}
+            </div>
+
+            <p class="text-center mt-4 text-muted small">
+                <a href="{% url 'compra:lista' %}">← Volver a mi lista</a>
+            </p>
+
+        </div>
+    </div>
+</div>
+
+{% bootstrap_javascript %}
+<script>
+async function empezar() {
+    await fetch("{% url 'usuarios:completar_onboarding' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    });
+    window.location.href = "{% url 'compra:lista' %}";
+}
+</script>
+</body>
+</html>

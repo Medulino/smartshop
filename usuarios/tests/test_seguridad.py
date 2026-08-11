@@ -219,3 +219,32 @@ class ObtenerIpTests(TestCase):
         request.META['wsgi.url_scheme'] = 'https'
         with self.settings(CONFIAR_XFF_EN_HTTPS=False):
             self.assertEqual(seguridad.obtener_ip(request), '10.0.0.1')
+
+
+class ContentSecurityPolicyTests(TestCase):
+    """Todas las respuestas llevan cabecera CSP que solo permite orígenes
+    propios (más el CDN de Bootstrap) y bloquea iframes, plugins y navegación
+    a sitios ajenos."""
+
+    def _csp(self, respuesta):
+        self.assertIn('Content-Security-Policy', respuesta)
+        return respuesta['Content-Security-Policy']
+
+    def test_login_lleva_csp_con_restricciones(self):
+        csp = self._csp(self.client.get(reverse('usuarios:login')))
+        self.assertIn("default-src 'self'", csp)
+        self.assertIn("object-src 'none'", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn('https://cdn.jsdelivr.net', csp)
+        self.assertNotIn('http://', csp)
+
+    def test_paginas_protegidas_llevan_csp(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        for url in (reverse('compra:lista'), reverse('usuarios:plan')):
+            csp = self._csp(self.client.get(url))
+            self.assertIn("default-src 'self'", csp)
+
+    def test_no_se_permite_conectar_a_origenes_externos(self):
+        csp = self._csp(self.client.get(reverse('usuarios:login')))
+        self.assertIn("connect-src 'self'", csp)

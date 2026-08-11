@@ -271,91 +271,6 @@ select option { background-color: #2b2b2b; color: #f0f0f0; }
 
 </div>
 
-{% if flags.onboarding and not prefs.onboarding_completado %}
-<div class="modal fade" id="modalOnboarding" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <h4 class="modal-title">👋 Bienvenido a Compra Inteligente</h4>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted mb-4">Guía rápida para sacarle el máximo partido:</p>
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">📝</div>
-                                <h6 class="fw-bold">Añadir productos</h6>
-                                <p class="text-muted small mb-0">Escribe un producto y pulsa Añadir o Enter. La app lo asignará automáticamente al pasillo correcto de tu supermercado.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">📷</div>
-                                <h6 class="fw-bold">Sube una foto de tu lista</h6>
-                                <p class="text-muted small mb-0">¿Tienes una lista escrita a mano? Sube una foto y la IA leerá y ordenará los productos automáticamente por pasillos.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">📍</div>
-                                <h6 class="fw-bold">Productos sin pasillo</h6>
-                                <p class="text-muted small mb-0">Si un producto aparece como "Sin asignar", usa el selector para asignarlo. La app lo recordará para siempre.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">⚙️</div>
-                                <h6 class="fw-bold">Configura tu supermercado</h6>
-                                <p class="text-muted small mb-0">Pulsa ⚙️ para reordenar pasillos, añadir nuevos o gestionar palabras clave según tu super real.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">⭐</div>
-                                <h6 class="fw-bold">Guarda tus listas favoritas</h6>
-                                <p class="text-muted small mb-0">Pulsa "⭐ Mis listas" para guardar tu lista actual como plantilla y reutilizarla cuando quieras.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <div class="card h-100 border-0 bg-light">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">📜</div>
-                                <h6 class="fw-bold">Historial de compras</h6>
-                                <p class="text-muted small mb-0">Pulsa 📜 para ver tus compras anteriores y repetir cualquiera de las últimas 5 con un solo toque.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="card border-0 bg-success bg-opacity-10">
-                            <div class="card-body">
-                                <div class="fs-2 mb-2">✅</div>
-                                <h6 class="fw-bold text-success">Durante la compra</h6>
-                                <p class="text-muted small mb-0">Los productos aparecen ordenados por pasillos. Marca cada uno cuando lo metas en el carro. Al terminar pulsa "✅ Finalizar" para cerrar la lista y guardarla en el historial. Descarga el PDF si lo necesitas.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-success px-4" onclick="cerrarOnboarding()">
-                    ¡Entendido, empezar!
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {% bootstrap_javascript %}
 <script>
 const LISTA_ID = {{ lista.id|default:"null" }};
@@ -501,20 +416,6 @@ document.getElementById('input-producto')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') añadirProducto();
 });
 
-{% if flags.onboarding and not prefs.onboarding_completado %}
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = new bootstrap.Modal(document.getElementById('modalOnboarding'));
-    modal.show();
-});
-
-async function cerrarOnboarding() {
-    await fetch("{% url 'usuarios:completar_onboarding' %}", {
-        method: 'POST',
-        headers: { 'X-CSRFToken': CSRF }
-    });
-    bootstrap.Modal.getInstance(document.getElementById('modalOnboarding')).hide();
-}
-{% endif %}
 </script>
 </body>
 </html>

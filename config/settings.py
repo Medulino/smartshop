@@ -101,6 +101,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'usuarios.middleware.ContentSecurityPolicyMiddleware',
     'usuarios.middleware.AdminLoginRateLimitMiddleware',
 ]
 
@@ -253,6 +254,24 @@ else:
 
 # Caducidad del enlace de activación de cuenta: 24 horas.
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
+
+# Content-Security-Policy (ver usuarios/middleware.py:ContentSecurityPolicyMiddleware).
+# Pragmática: se permiten scripts/estilos inline (las plantillas usan JS/CSS
+# inline y atributos style/onclick) y el CDN de Bootstrap; se bloquean el resto
+# de orígenes externos, iframes, objetos/plugins y la navegación a sitios ajenos.
+CSP_HEADER = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: blob: https://cdn.jsdelivr.net; "
+    "font-src 'self' data: https://cdn.jsdelivr.net; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-src 'self'; "
+    "frame-ancestors 'none'; "
+)
 
 # Dominios de correo temporal/descartable rechazados en el registro.
 # La verificación por email es la capa real de seguridad; esta lista es solo

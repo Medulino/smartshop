@@ -10,6 +10,7 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('onboarding/', views.completar_onboarding, name='completar_onboarding'),
     path('premium/', views.premium, name='premium'),
+    path('plan/', views.plan, name='plan'),
     path('cambiar-password/', auth_views.PasswordChangeView.as_view(
         template_name='usuarios/cambiar_password.html',
         success_url=reverse_lazy('usuarios:cambiar_password_hecho'),

@@ -16,8 +16,9 @@ from compra.tests.utils import (
     crear_supermercado,
     crear_pasillo,
     crear_keyword,
+    crear_premium,
 )
-from usuarios.models import Usuario, PreferenciaUsuario
+from usuarios.models import Usuario, PreferenciaUsuario, FeatureFlag
 
 
 class RegistroViewTests(TestCase):
@@ -349,6 +350,57 @@ class ListaCompraProtegidaTests(TestCase):
         respuesta = self.client.get(reverse('compra:lista'))
         self.assertEqual(respuesta.status_code, 302)
         self.assertIn(reverse('usuarios:login'), respuesta.url)
+
+
+class PlanViewTests(TestCase):
+    """El onboarding se muestra como comparativa Básico vs Premium en /plan."""
+
+    def setUp(self):
+        FeatureFlag.objects.create(nombre='onboarding', activo=True)
+
+    def test_sin_login_redirige_a_login(self):
+        respuesta = self.client.get(reverse('usuarios:plan'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('usuarios:login'), respuesta.url)
+
+    def test_con_login_renderiza_la_comparativa(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.get(reverse('usuarios:plan'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Elige tu plan')
+        self.assertContains(respuesta, 'Básico')
+        self.assertContains(respuesta, 'Premium')
+
+    def test_lista_redirige_a_plan_si_onboarding_pendiente(self):
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        respuesta = self.client.get(reverse('compra:lista'))
+        self.assertRedirects(respuesta, reverse('usuarios:plan'))
+
+    def test_lista_no_redirige_si_onboarding_completado(self):
+        usuario = crear_usuario()
+        usuario.preferencias.onboarding_completado = True
+        usuario.preferencias.save()
+        self.client.force_login(usuario)
+        respuesta = self.client.get(reverse('compra:lista'))
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_marca_como_completado_y_vuelve_a_la_lista(self):
+        # El botón "Comenzar a usar la app" hace POST a completar_onboarding
+        # y redirige a la lista, que ya no vuelve a mostrar la comparativa.
+        usuario = crear_usuario()
+        self.client.force_login(usuario)
+        self.client.post(reverse('usuarios:completar_onboarding'))
+        respuesta = self.client.get(reverse('compra:lista'))
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_premium_muestra_la_fecha_de_vencimiento(self):
+        usuario = crear_premium()
+        self.client.force_login(usuario)
+        respuesta = self.client.get(reverse('usuarios:plan'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Premium hasta')
 
 
 class CambiarPasswordTests(TestCase):
