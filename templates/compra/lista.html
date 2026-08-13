@@ -319,11 +319,15 @@ async function analizarFoto(event) {
     formData.append('lista_id', LISTA_ID);
     formData.append('csrfmiddlewaretoken', CSRF);
     try {
+        const controller = new AbortController();
+        const temporizador = setTimeout(() => controller.abort(), 75000);
         const resp = await fetch("{% url 'compra:analizar_foto' %}", {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
         const data = await resp.json();
+        clearTimeout(temporizador);
         document.getElementById('spinner').classList.remove('active');
         if (resp.ok) {
             mostrarMensaje(`✅ Se añadieron ${data.productos_añadidos} productos`, 'ok');
@@ -332,8 +336,9 @@ async function analizarFoto(event) {
             mostrarMensaje(data.error || 'Error al procesar la imagen', 'err');
         }
     } catch (e) {
+        clearTimeout(temporizador);
         document.getElementById('spinner').classList.remove('active');
-        mostrarMensaje('Error de conexión. Inténtalo de nuevo.', 'err');
+        mostrarMensaje('El análisis está tardando demasiado. Inténtalo de nuevo.', 'err');
     }
     event.target.value = '';
 }

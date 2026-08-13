@@ -13,14 +13,30 @@ logger = logging.getLogger(__name__)
 MAX_PASILLOS_IMPORTACION = 100
 MAX_KEYWORDS_POR_PASILLO = 30
 
+# Modelos gratuitos de Gemini con visión disponibles para esta API key.
+# Se prueban en orden y se corta en MAX_INTENTOS_IA para que el peor caso
+# (3 × 20 s = 60 s) siga cabiendo de sobra en el timeout de gunicorn (120 s).
+MODELOS_IA_VISION = [
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+]
+MAX_INTENTOS_IA = 3
+
 
 def _cliente_ia():
     from google import genai
     from google.genai import types
-    # Ojo: HttpOptions.timeout va en MILISEGUNDOS (60 s = 60_000).
+    # Ojo: HttpOptions.timeout va en MILISEGUNDOS (20 s = 20_000). Corto a
+    # propósito: un análisis foto/texto normal tarda ~3 s y con MAX_INTENTOS_IA
+    # intentos (máx. 60 s) cabe de sobra en el timeout de gunicorn (120 s)
+    # para que el worker no muera a mitad y la app no se "congele" si la IA
+    # se satura.
     return genai.Client(
         api_key=settings.GEMINI_API_KEY,
-        http_options=types.HttpOptions(timeout=60_000),
+        http_options=types.HttpOptions(timeout=20_000),
     )
 
 
@@ -201,11 +217,6 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     """
     client = _cliente_ia()
 
-    modelos = [
-        'gemini-3.5-flash',
-        'gemini-flash-latest',
-    ]
-
     prompt = """
     Eres un experto organizando supermercados. Un usuario te va a describir,
     de forma libre y desordenada (puede estar dictado por voz, con errores
@@ -230,7 +241,7 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     Esto es lo que ha descrito el usuario:
     """ + descripcion_libre
 
-    for nombre_modelo in modelos:
+    for nombre_modelo in MODELOS_IA_VISION[:MAX_INTENTOS_IA]:
         try:
             response = client.models.generate_content(
                 model=nombre_modelo, contents=prompt
@@ -245,13 +256,7 @@ def estructurar_pasillos_con_ia(descripcion_libre):
 
 
 def leer_lista_desde_imagen(imagen_file):
-    import time
     client = _cliente_ia()
-
-    modelos = [
-        'gemini-3.5-flash',
-        'gemini-flash-latest',
-    ]
 
     prompt = """
     Eres un experto en transcripción de listas de la compra.
@@ -264,28 +269,28 @@ def leer_lista_desde_imagen(imagen_file):
     buffer_reducido = redimensionar_imagen(imagen_file)
     img = PIL.Image.open(buffer_reducido)
 
-    for nombre_modelo in modelos:
-        for intento in range(3):
-            try:
-                response = client.models.generate_content(
-                    model=nombre_modelo, contents=[prompt, img]
-                )
-                if response.text:
-                    texto = response.text.replace('\n', ',').replace(';', ',')
-                    productos = [
-                        p.strip().lower()
-                        for p in texto.split(',')
-                        if p.strip() and len(p.strip()) > 1
-                    ][:MAX_KEYWORDS_POR_PASILLO]
-                    return productos, None
-            except Exception as e:
-                logger.warning(
-                    'Error de IA en leer_lista_desde_imagen (%s, intento %s): %s',
-                    nombre_modelo, intento + 1, e
-                )
-                if intento < 2:
-                    time.sleep(1 + intento)
-                    continue
-            break
+    # Un intento por modelo gratuito de visión (hasta MAX_INTENTOS_IA) y sin
+    # reintentos: si un modelo está saturado, se pasa al siguiente. Reintentar
+    # en bucle solo alarga la espera hasta que gunicorn mata al worker.
+    for nombre_modelo in MODELOS_IA_VISION[:MAX_INTENTOS_IA]:
+        try:
+            response = client.models.generate_content(
+                model=nombre_modelo, contents=[prompt, img]
+            )
+            if response.text:
+                texto = response.text.replace('\n', ',').replace(';', ',')
+                productos = [
+                    p.strip().lower()
+                    for p in texto.split(',')
+                    if p.strip() and len(p.strip()) > 1
+                ][:MAX_KEYWORDS_POR_PASILLO]
+                return productos, None
+        except Exception as e:
+            logger.warning(
+                'Error de IA en leer_lista_desde_imagen (%s): %s',
+                nombre_modelo, e
+            )
 
-    return [], "El servicio de análisis no está disponible ahora mismo. Inténtalo más tarde."
+    return [], ("El análisis con IA está tardando demasiado o la IA está "
+                "saturada ahora mismo (posible límite de fotos del día del "
+                "plan gratuito). Espera un momento e inténtalo de nuevo.")
