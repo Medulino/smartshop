@@ -191,6 +191,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # IA
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+# Respaldo para leer fotos cuando Gemini está saturado (límites gratuitos).
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
 # Proxies de confianza (p.ej. nginx) que reenvían X-Forwarded-For.
 # Vacío = sin proxy: se usa REMOTE_ADDR, que el cliente no puede falsificar.

@@ -320,7 +320,7 @@ async function analizarFoto(event) {
     formData.append('csrfmiddlewaretoken', CSRF);
     try {
         const controller = new AbortController();
-        const temporizador = setTimeout(() => controller.abort(), 75000);
+        const temporizador = setTimeout(() => controller.abort(), 110000);
         const resp = await fetch("{% url 'compra:analizar_foto' %}", {
             method: 'POST',
             body: formData,

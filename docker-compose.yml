@@ -5,10 +5,12 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # Red del host: el contenedor sale a internet con el mismo enrutado que
+    # el host (imprescindible aquí: la VPN de NordVPN en modo split-tunnel
+    # no se aplica al tráfico de los contenedores en red bridge, y sin ella
+    # Gemini/OpenRouter cortan la conexión TLS). El puerto lo fija gunicorn
+    # en el Dockerfile (8010). La BD del host se alcanza por 127.0.0.1.
+    network_mode: host
     volumes:
       - static_files:/app/staticfiles
       - media_files:/app/media
@@ -17,7 +19,7 @@ services:
     mem_limit: 1g
     cpus: 2
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/salud/', timeout=3)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/salud/', timeout=3)\""]
       interval: 30s
       timeout: 5s
       retries: 3

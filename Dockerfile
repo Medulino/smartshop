@@ -40,9 +40,9 @@ RUN useradd --system --uid 1001 appuser \
 
 USER appuser
 
-# Puerto
-EXPOSE 8000
+# Puerto (con network_mode: host es el puerto que escucha en el host)
+EXPOSE 8010
 
 # Arrancar con gunicorn. Timeouts para no dejar colgados los workers con
 # peticiones lentas (IA/PDF) y reciclaje de memoria por cada 1000 peticiones.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "--graceful-timeout", "60", "--keep-alive", "5", "--max-requests", "1000", "--max-requests-jitter", "100"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8010", "--workers", "3", "--timeout", "120", "--graceful-timeout", "60", "--keep-alive", "5", "--max-requests", "1000", "--max-requests-jitter", "100"]

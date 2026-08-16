@@ -3,6 +3,7 @@ import logging
 
 import PIL.Image
 import PIL.ImageOps
+import requests
 from django.conf import settings
 from .utils import normalizar
 
@@ -24,6 +25,20 @@ MODELOS_IA_VISION = [
     'gemini-2.5-flash-lite',
 ]
 MAX_INTENTOS_IA = 3
+
+# Modelos con visión de OpenRouter (respaldo cuando Gemini está saturado).
+# Se prueban primero los gratuitos (:free); el pool gratuito de Google AI
+# Studio puede estar saturado (429), así que al final se usa un modelo de
+# pago MUY barato como última opción: una foto cuesta ~0,0002 USD. Se usa
+# google/gemma-3-4b-it porque pasa las restricciones de privacidad de la
+# cuenta (los modelos Qwen dan 404 por la política de datos de OpenRouter).
+# Presupuesto de tiempo: free 2 × 15 s + pago 1 × 15 s = 45 s, que sumados
+# a los 60 s de Gemini (3 × 20 s) dejan ~110 s < timeout de gunicorn (120 s).
+MODELOS_IA_VISION_OPENROUTER_FREE = [
+    'google/gemma-4-26b-a4b-it:free',
+    'google/gemma-4-31b-it:free',
+]
+MODELO_IA_VISION_OPENROUTER_PAGO = 'google/gemma-3-4b-it'
 
 
 def _cliente_ia():
@@ -255,6 +270,62 @@ def estructurar_pasillos_con_ia(descripcion_libre):
     return None, "El servicio de IA no está disponible ahora mismo. Inténtalo más tarde."
 
 
+def _parsear_productos(texto):
+    texto = texto.replace('\n', ',').replace(';', ',')
+    return [
+        p.strip().lower()
+        for p in texto.split(',')
+        if p.strip() and len(p.strip()) > 1
+    ][:MAX_KEYWORDS_POR_PASILLO]
+
+
+def _leer_foto_con_openrouter(prompt, buffer_jpeg):
+    """Respaldo con OpenRouter (OpenAI-compatible) para leer la foto."""
+    api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
+    if not api_key:
+        return None
+    try:
+        import base64
+        buffer_jpeg.seek(0)
+        b64 = base64.b64encode(buffer_jpeg.read()).decode('ascii')
+        url_imagen = 'data:image/jpeg;base64,' + b64
+    except Exception as e:
+        logger.warning('OpenRouter: no se pudo preparar la imagen: %s', e)
+        return None
+
+    # Modelos gratuitos primero; solo si todos fallan, el de pago barato.
+    modelos = list(MODELOS_IA_VISION_OPENROUTER_FREE[:2])
+    modelos.append(MODELO_IA_VISION_OPENROUTER_PAGO)
+
+    for nombre_modelo in modelos:
+        try:
+            resp = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers={
+                    'Authorization': 'Bearer ' + api_key,
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'model': nombre_modelo,
+                    'messages': [{
+                        'role': 'user',
+                        'content': [
+                            {'type': 'text', 'text': prompt},
+                            {'type': 'image_url', 'image_url': {'url': url_imagen}},
+                        ],
+                    }],
+                },
+                timeout=15,
+            )
+            data = resp.json()
+            texto = data['choices'][0]['message']['content']
+            if texto:
+                return texto
+        except Exception as e:
+            logger.warning('Error en OpenRouter (%s): %s', nombre_modelo, e)
+    return None
+
+
 def leer_lista_desde_imagen(imagen_file):
     client = _cliente_ia()
 
@@ -278,18 +349,18 @@ def leer_lista_desde_imagen(imagen_file):
                 model=nombre_modelo, contents=[prompt, img]
             )
             if response.text:
-                texto = response.text.replace('\n', ',').replace(';', ',')
-                productos = [
-                    p.strip().lower()
-                    for p in texto.split(',')
-                    if p.strip() and len(p.strip()) > 1
-                ][:MAX_KEYWORDS_POR_PASILLO]
-                return productos, None
+                return _parsear_productos(response.text), None
         except Exception as e:
             logger.warning(
                 'Error de IA en leer_lista_desde_imagen (%s): %s',
                 nombre_modelo, e
             )
+
+    # Respaldo con OpenRouter: solo se usa si la clave está configurada y
+    # Gemini no ha podido leer la foto (p.ej. límite diario gratuito).
+    texto = _leer_foto_con_openrouter(prompt, buffer_reducido)
+    if texto:
+        return _parsear_productos(texto), None
 
     return [], ("El análisis con IA está tardando demasiado o la IA está "
                 "saturada ahora mismo (posible límite de fotos del día del "
